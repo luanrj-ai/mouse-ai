@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mouseAI · 指哪解释哪的鼠标 Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4efe4; --bg-2:#ebe5d6; --ink:#14110d; --ink-2:#423d33; --ink-3:#7a7264;
+    --line:#1a16100f; --line-2:#1a16101a;
+    --accent:#fbd02e; --accent-ink:#1a1610; --danger:#c84a2e; --safe:#2f8a5c;
+    --term-bg:#0d0c0a; --term-bg-2:#18160f; --term-ink:#f1ebd7; --term-dim:#8a8268;
+    --popup-bg:#1c1c1ef2; --radius:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  html,body{background:var(--bg); color:var(--ink);
+    font-family:"Geist","Noto Sans SC",-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;}
+  body{background:
+      radial-gradient(900px 600px at 85% -10%, #fbd02e22 0%, transparent 60%),
+      radial-gradient(700px 500px at -10% 30%, #ffffff80 0%, transparent 60%),
+      var(--bg);
+    min-height:100vh; overflow-x:hidden;}
+  .mono{font-family:"JetBrains Mono",ui-monospace,SF Mono,Menlo,monospace}
+  .wrap{max-width:1240px; margin:0 auto; padding:0 28px}
+
+  /* nav */
+  nav.top{position:sticky; top:0; z-index:50; backdrop-filter:blur(14px);
+    background:#f4efe4cc; border-bottom:1px solid var(--line)}
+  nav.top .inner{display:flex; align-items:center; justify-content:space-between;
+    padding:14px 28px; max-width:1240px; margin:0 auto}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:600}
+  .brand .logo{width:28px; height:28px; background:var(--ink); color:var(--accent);
+    border-radius:7px; display:grid; place-items:center}
+  .brand .name{font-size:18px; letter-spacing:-.015em; font-weight:600}
+  .brand .tag{font-size:11px; padding:2px 7px; border-radius:99px;
+    background:var(--ink); color:var(--bg); font-weight:500; margin-left:4px}
+  nav.top .links{display:flex; gap:24px; align-items:center}
+  nav.top .links a{color:var(--ink-2); text-decoration:none; font-size:14px}
+  nav.top .links a:hover{color:var(--ink)}
+  .btn{display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:99px;
+    background:var(--ink); color:var(--bg); font-size:14px; font-weight:500;
+    text-decoration:none; border:1px solid var(--ink); cursor:pointer;
+    transition:transform .15s ease, background .15s ease}
+  .btn:hover{transform:translateY(-1px)}
+  .btn.ghost{background:transparent; color:var(--ink)}
+  .btn.ghost:hover{background:var(--ink); color:var(--bg)}
+  .btn.accent{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+  .lang{font-family:"JetBrains Mono"; font-size:12px; border:1px solid var(--line-2);
+    background:#ffffff80; border-radius:99px; padding:5px 10px; cursor:pointer; color:var(--ink-2)}
+  .lang b{color:var(--ink)}
+
+  /* hero */
+  section.hero{padding:60px 0 80px}
+  .hero-grid{display:grid; grid-template-columns:1.05fr 1fr; gap:56px; align-items:center}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:500;
+    letter-spacing:.04em; text-transform:uppercase; color:var(--ink-2);
+    padding:6px 12px; border:1px solid var(--line-2); border-radius:99px; background:#ffffff70}
+  .eyebrow .dot{width:6px; height:6px; border-radius:99px; background:var(--safe)}
+  h1.headline{font-size:clamp(38px,5.2vw,64px); line-height:1.06; letter-spacing:-.025em;
+    font-weight:600; margin:22px 0 24px; text-wrap:balance}
+  h1.headline .hl{background:linear-gradient(transparent 55%, var(--accent) 55%); padding:0 4px}
+  h1.headline .strike{text-decoration:line-through; text-decoration-color:var(--danger);
+    text-decoration-thickness:3px; color:var(--ink-3)}
+  p.sub{font-size:19px; line-height:1.55; color:var(--ink-2); max-width:540px; margin-bottom:32px}
+  .cta-row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+  .cta-meta{font-size:13px; color:var(--ink-3); display:flex; align-items:center; gap:6px; margin-left:4px}
+  .kbd-inline{font-family:"JetBrains Mono"; font-size:11px; padding:2px 6px; border-radius:5px;
+    background:#fff; border:1px solid var(--line-2); color:var(--ink)}
+
+  /* terminal demo */
+  .demo-shell{position:relative; border-radius:16px; background:var(--term-bg);
+    box-shadow:0 30px 60px -20px rgba(20,17,13,.35), 0 0 0 1px rgba(20,17,13,.08);
+    overflow:hidden; min-height:460px}
+  .term-bar{display:flex; align-items:center; gap:8px; padding:11px 14px;
+    background:var(--term-bg-2); border-bottom:1px solid #ffffff10}
+  .term-bar .dots{display:flex; gap:6px}
+  .term-bar .dots span{width:11px; height:11px; border-radius:99px}
+  .term-bar .dots span:nth-child(1){background:#ed6a5e}
+  .term-bar .dots span:nth-child(2){background:#f4be4f}
+  .term-bar .dots span:nth-child(3){background:#61c554}
+  .term-bar .title{color:var(--term-dim); font-family:"JetBrains Mono"; font-size:12px; margin-left:6px}
+  .term-body{padding:18px 20px 24px; font-family:"JetBrains Mono"; font-size:13px; line-height:1.65;
+    color:var(--term-ink); min-height:380px; position:relative}
+  .term-body .line{white-space:pre-wrap}
+  .term-body .prompt{color:#61c554}.term-body .dim{color:var(--term-dim)}
+  .term-body .warn{color:#f4be4f}.term-body .err{color:#ed6a5e}.term-body .cc{color:#d6b6ff}
+  .term-body .sel{background:#fbd02e44; color:var(--term-ink); border-radius:2px; box-shadow:0 0 0 1px #fbd02e88}
+  .term-body .caret{display:inline-block; width:7px; height:14px; background:var(--term-ink);
+    vertical-align:-2px; animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .popup{position:absolute; right:18px; bottom:18px; width:320px; background:var(--popup-bg);
+    color:#f2f2f7; border-radius:14px; padding:16px 18px; border:.5px solid #ffffff22;
+    backdrop-filter:blur(20px); box-shadow:0 20px 50px -10px rgba(0,0,0,.5);
+    font-size:13px; line-height:1.55; opacity:0; transform:translateY(6px) scale(.98);
+    transition:opacity .25s ease, transform .25s ease; pointer-events:none}
+  .popup.show{opacity:1; transform:translateY(0) scale(1); pointer-events:auto}
+  .popup .pop-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+  .popup .pop-title{font-size:11px; color:#ffffff80; font-family:"JetBrains Mono";
+    text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:6px}
+  .popup .pop-title .pulse{width:6px; height:6px; border-radius:99px; background:var(--accent);
+    animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #fbd02e80}50%{box-shadow:0 0 0 6px #fbd02e00}}
+  .popup .pop-close{color:#ffffff60; font-size:11px; font-family:"JetBrains Mono"}
+  .popup b{color:#ffe25e; font-weight:600}
+  .popup code{color:#ffe25e; font-family:"JetBrains Mono"}
+  .popup .verdict{margin-top:10px; padding-top:10px; border-top:1px solid #ffffff14;
+    display:flex; align-items:center; gap:8px; font-size:12px}
+  .popup .verdict.safe{color:#88e0b0}.popup .verdict.warn{color:#ffc560}.popup .verdict.deny{color:#ff8a78}
+  .popup .esc{margin-top:12px; font-size:10px; color:#ffffff50; font-family:"JetBrains Mono"}
+  .demo-controls{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px}
+  .pill{background:#fff; border:1px solid var(--line-2); border-radius:99px; padding:8px 14px;
+    font-size:13px; color:var(--ink-2); cursor:pointer; transition:all .15s ease;
+    display:inline-flex; align-items:center; gap:8px}
+  .pill .kbd{font-family:"JetBrains Mono"; font-size:10px; background:var(--bg-2);
+    padding:2px 5px; border-radius:4px; color:var(--ink-2)}
+  .pill:hover{border-color:var(--ink); color:var(--ink)}
+  .pill.active{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+  .pill.active .kbd{background:#ffffff20; color:var(--bg)}
+  .demo-hint{margin-top:10px; font-size:12px; color:var(--ink-3); display:flex; align-items:center; gap:6px}
+
+  /* sections */
+  .section{padding:80px 0; border-top:1px solid var(--line)}
+  .section-head{margin-bottom:56px; max-width:800px}
+  .section-head .label{font-family:"JetBrains Mono"; font-size:12px; color:var(--ink-3);
+    text-transform:uppercase; letter-spacing:.08em; margin-bottom:14px}
+  .section-head h2{font-weight:600; font-size:clamp(30px,4vw,46px); line-height:1.1;
+    letter-spacing:-.02em; margin-bottom:16px; text-wrap:balance}
+  .section-head h2 .mk{background:var(--accent); padding:0 6px; border-radius:4px}
+  .section-head p{font-size:17px; color:var(--ink-2); line-height:1.5; max-width:620px}
+
+  /* anti-positioning */
+  .anti-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:28px}
+  .anti-card{background:#fff; border:1px solid var(--line-2); border-radius:14px; padding:22px; position:relative}
+  .anti-card .kill{position:absolute; top:14px; right:14px; width:28px; height:28px; border-radius:99px;
+    background:#f7e3df; color:var(--danger); display:grid; place-items:center; font-size:14px}
+  .anti-card h3{font-size:16px; font-weight:600; margin-bottom:8px; color:var(--ink-3);
+    text-decoration:line-through; text-decoration-color:var(--danger); text-decoration-thickness:2px; padding-right:38px}
+  .anti-card p{font-size:14px; line-height:1.55; color:var(--ink-3)}
+  .answer-card{background:var(--ink); color:var(--bg); border-radius:14px; padding:28px;
+    display:grid; grid-template-columns:auto 1fr auto; gap:24px; align-items:center}
+  .answer-card .yes{width:44px; height:44px; border-radius:99px; background:var(--accent);
+    color:var(--accent-ink); display:grid; place-items:center; font-size:22px; font-weight:600}
+  .answer-card h3{font-size:22px; font-weight:600; margin-bottom:4px}
+  .answer-card p{font-size:15px; color:#ffffffaa; line-height:1.5}
+  .answer-card b{color:#fff}
+
+  /* how it works */
+  .hotkey-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+  .hotkey-card{background:#fff; border-radius:16px; border:1px solid var(--line-2); padding:28px;
+    transition:transform .2s ease, box-shadow .2s ease}
+  .hotkey-card:hover{transform:translateY(-2px); box-shadow:0 14px 30px -12px rgba(20,17,13,.12)}
+  .hotkey{display:inline-flex; gap:4px; margin-bottom:18px}
+  .key{font-family:"JetBrains Mono"; font-size:13px; font-weight:500; min-width:32px; height:32px;
+    background:var(--bg); border:1px solid var(--line-2); border-bottom-width:2px; border-radius:7px;
+    display:inline-flex; align-items:center; justify-content:center; padding:0 9px; color:var(--ink)}
+  .key.accent{background:var(--accent); border-color:#c9a52280; color:var(--accent-ink)}
+  .hotkey-card h3{font-size:19px; font-weight:600; margin-bottom:8px}
+  .hotkey-card .desc{font-size:14px; line-height:1.6; color:var(--ink-2); margin-bottom:16px}
+  .hotkey-card .example{background:var(--bg); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; font-family:"JetBrains Mono"; font-size:12px; line-height:1.55; color:var(--ink-2)}
+  .hotkey-card .example .arrow{color:var(--accent-ink); background:var(--accent); padding:0 4px; border-radius:3px}
+
+  /* comparison */
+  .comp{width:100%; border-collapse:separate; border-spacing:0; background:#fff; border-radius:16px;
+    overflow:hidden; border:1px solid var(--line-2)}
+  .comp th,.comp td{text-align:left; padding:14px 18px; font-size:14px; border-bottom:1px solid var(--line)}
+  .comp thead th{background:var(--bg-2); font-weight:500; color:var(--ink-2); font-size:13px; vertical-align:bottom}
+  .comp thead th.us{background:var(--ink); color:var(--bg); position:relative}
+  .comp thead th.us::after{content:""; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent)}
+  .comp tbody td{color:var(--ink-2)}
+  .comp tbody td.row-label{font-weight:500; color:var(--ink)}
+  .comp tbody td.us{background:#fbd02e15; color:var(--ink); font-weight:500}
+  .comp tbody tr:last-child td{border-bottom:none}
+  .comp .mark{font-family:"JetBrains Mono"; font-size:16px}
+  .comp .mark.yes{color:var(--safe)}.comp .mark.no{color:var(--ink-3); opacity:.5}.comp .mark.partial{color:#c9931a}
+
+  /* install */
+  .install-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px}
+  .step{background:#fff; border:1px solid var(--line-2); border-radius:14px; padding:24px 20px; position:relative}
+  .step .num{font-family:"JetBrains Mono"; font-size:12px; color:var(--ink-3); margin-bottom:12px}
+  .step h4{font-size:16px; font-weight:600; margin-bottom:6px}
+  .step p{font-size:13px; color:var(--ink-2); line-height:1.55}
+  .step .cmd{margin-top:10px; font-family:"JetBrains Mono"; font-size:11px; background:var(--bg);
+    border:1px solid var(--line); border-radius:6px; padding:6px 8px; color:var(--ink);
+    overflow-x:auto; white-space:nowrap}
+  .privacy-banner{background:var(--ink); color:var(--bg); border-radius:16px; padding:32px;
+    display:flex; align-items:center; gap:24px; flex-wrap:wrap}
+  .privacy-banner .icon{width:56px; height:56px; border-radius:14px; background:var(--accent);
+    color:var(--accent-ink); display:grid; place-items:center; flex-shrink:0}
+  .privacy-banner h3{font-size:20px; font-weight:600; margin-bottom:4px}
+  .privacy-banner p{font-size:14px; color:#ffffffaa; line-height:1.55; max-width:620px}
+  .privacy-banner .stat{display:flex; gap:28px; margin-left:auto}
+  .privacy-banner .stat div{text-align:right}
+  .privacy-banner .stat .n{font-family:"JetBrains Mono"; font-size:24px; font-weight:600; color:var(--accent)}
+  .privacy-banner .stat .l{font-size:11px; color:#ffffff80}
+
+  footer{padding:60px 0 40px; border-top:1px solid var(--line); margin-top:80px}
+  footer .inner{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:24px}
+  footer p{font-size:13px; color:var(--ink-3); line-height:1.6; max-width:380px}
+  footer .legal{font-size:12px; color:var(--ink-3); font-family:"JetBrains Mono"}
+  footer .legal a{color:var(--ink-2)}
+
+  @media(max-width:960px){
+    .hero-grid{grid-template-columns:1fr}
+    .anti-grid,.hotkey-grid{grid-template-columns:1fr}
+    .install-grid{grid-template-columns:1fr 1fr}
+    .answer-card{grid-template-columns:auto 1fr}
+    .privacy-banner .stat{margin-left:0}
+    nav.top .links a:not(.btn){display:none}
+  }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="inner">
+    <div class="brand">
+      <div class="logo">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 2.5 L3.5 11 L6 9 L7.5 12.5 L9 12 L7.5 8.5 L11 8.5 Z" fill="currentColor" stroke="currentColor" stroke-width="0.7" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="name">mouseAI</div>
+      <span class="tag mono">v0 · 看懂</span>
+    </div>
+    <div class="links">
+      <a href="#why" data-i18n="nav_why"></a>
+      <a href="#how" data-i18n="nav_how"></a>
+      <a href="#compare" data-i18n="nav_compare"></a>
+      <a href="#install" data-i18n="nav_install"></a>
+      <button class="lang" id="langToggle"></button>
+      <a class="btn" href="#install" data-i18n="nav_cta"></a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero"><div class="wrap"><div class="hero-grid">
+  <div>
+    <span class="eyebrow"><span class="dot"></span><span data-i18n="hero_eyebrow"></span></span>
+    <h1 class="headline" data-i18n="hero_h1"></h1>
+    <p class="sub" data-i18n="hero_sub"></p>
+    <div class="cta-row">
+      <a class="btn accent" href="#install" data-i18n="hero_cta1"></a>
+      <a class="btn ghost" href="#how" data-i18n="hero_cta2"></a>
+      <span class="cta-meta" data-i18n="hero_meta"></span>
+    </div>
+  </div>
+  <div>
+    <div class="demo-shell">
+      <div class="term-bar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="title" id="termTitle"></div>
+      </div>
+      <div class="term-body" id="termBody"></div>
+    </div>
+    <div class="demo-controls" id="demoControls"></div>
+    <div class="demo-hint" id="demoHint"></div>
+  </div>
+</div></div></section>
+
+<!-- WHY / anti-positioning -->
+<section class="section" id="why"><div class="wrap">
+  <div class="section-head">
+    <div class="label" data-i18n="why_label"></div>
+    <h2 data-i18n="why_h2"></h2>
+    <p data-i18n="why_p"></p>
+  </div>
+  <div class="anti-grid" id="antiGrid"></div>
+  <div class="answer-card">
+    <div class="yes">✓</div>
+    <div>
+      <h3 data-i18n="answer_h"></h3>
+      <p data-i18n="answer_p"></p>
+    </div>
+    <a href="#how" class="btn accent" data-i18n="answer_cta"></a>
+  </div>
+</div></section>
+
+<!-- HOW -->
+<section class="section" id="how" style="background:#ffffff80"><div class="wrap">
+  <div class="section-head">
+    <div class="label" data-i18n="how_label"></div>
+    <h2 data-i18n="how_h2"></h2>
+    <p data-i18n="how_p"></p>
+  </div>
+  <div class="hotkey-grid" id="hotkeyGrid"></div>
+</div></section>
+
+<!-- COMPARE -->
+<section class="section" id="compare"><div class="wrap">
+  <div class="section-head">
+    <div class="label" data-i18n="cmp_label"></div>
+    <h2 data-i18n="cmp_h2"></h2>
+    <p data-i18n="cmp_p"></p>
+  </div>
+  <table class="comp" id="compTable"></table>
+</div></section>
+
+<!-- INSTALL -->
+<section class="section" id="install" style="background:#ffffff80"><div class="wrap">
+  <div class="section-head">
+    <div class="label" data-i18n="ins_label"></div>
+    <h2 data-i18n="ins_h2"></h2>
+    <p data-i18n="ins_p"></p>
+  </div>
+  <div class="install-grid" id="installGrid"></div>
+  <div class="privacy-banner">
+    <div class="icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+    <div>
+      <h3 data-i18n="priv_h"></h3>
+      <p data-i18n="priv_p"></p>
+    </div>
+    <div class="stat">
+      <div><div class="n">0</div><div class="l" data-i18n="priv_s1"></div></div>
+      <div><div class="n">0</div><div class="l" data-i18n="priv_s2"></div></div>
+      <div><div class="n">0</div><div class="l" data-i18n="priv_s3"></div></div>
+    </div>
+  </div>
+</div></section>
+
+<footer><div class="wrap inner">
+  <div>
+    <div class="brand" style="margin-bottom:12px">
+      <div class="logo"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 2.5 L3.5 11 L6 9 L7.5 12.5 L9 12 L7.5 8.5 L11 8.5 Z" fill="currentColor" stroke="currentColor" stroke-width="0.7" stroke-linejoin="round"/></svg></div>
+      <div class="name">mouseAI</div>
+    </div>
+    <p data-i18n="foot_p"></p>
+  </div>
+  <div class="legal" data-i18n="foot_legal"></div>
+</div></footer>
+
+<script>
+const I18N = {
+  cn: {
+    nav_why:"为什么", nav_how:"怎么用", nav_compare:"对比", nav_install:"安装", nav_cta:"立即安装 →",
+    hero_eyebrow:"v0 · 看懂 · 已开放试用",
+    hero_h1:'在终端里<span class="hl">指哪解释哪</span>。<br>不用切窗口、<br><span class="strike">不用稀里糊涂点继续</span>。',
+    hero_sub:'<b>mouseAI</b> 是给非技术的人用的鼠标 Agent。在 Claude Code 里划选任何看不懂的东西,按个快捷键,用大白话解释——<b>常见的当场秒答,其余几秒出结果</b>;cc 要执行操作时,还会告诉你它要干嘛、有没有风险、该不该放行。',
+    hero_cta1:"复制安装命令 →", hero_cta2:"先看看怎么用",
+    hero_meta:'复用本机 <span class="kbd-inline">Claude Code</span> · 零 API key · 零上传',
+    why_label:"为什么是 mouseAI",
+    why_h2:'不是新 AI,是给你一个<span class="mk">看得见的把手</span>',
+    why_p:'非技术的人用 cc 最大的问题不是"做不出来",是<b>不知道刚才那一屏到底是怎么回事</b>。我们补的是这一层。',
+    answer_h:'cc 的"翻译官 + 拦路员"',
+    answer_p:'不替你写代码,不替你做决定——但保证你<b>每一步都知道自己在同意什么</b>。',
+    answer_cta:"看 3 个用法 →",
+    how_label:"怎么用 · 3 个快捷键",
+    how_h2:"装好之后,你只需要记住三个键。",
+    how_p:"没有面板、没有侧边栏、没有要登录的网页。它就藏在你终端的快捷键里,要的时候按一下。",
+    cmp_label:"和其他东西不一样在哪",
+    cmp_h2:"我们不和别人抢同一个用户。",
+    cmp_p:'市面上的 AI 工具都假设你"想做什么",我们假设你"已经在做什么,但需要看懂"。',
+    ins_label:"安装 · macOS",
+    ins_h2:"四步,五分钟,不用注册。",
+    ins_p:"需要本机已经装好并登录过 Claude Code(任意 plan)。v0 目前只跑 macOS,Linux/Windows 在路上。",
+    priv_h:"本地优先 · 不上传任何屏幕内容",
+    priv_p:'默认所有解释都通过你自己已经登录的 Claude Code 发出,我们这边没有服务器、没有 API key、没有账号系统,屏幕内容不出本机。卸载就是删一个 .lua 文件。<br><span style="opacity:.65">想更快?可选配你自己的 API key 接云端模型——默认关闭,开了才会走云端。</span>',
+    priv_s1:"服务器", priv_s2:"API key", priv_s3:"账号",
+    foot_p:'非技术的人用 AI 编程工具时,缺的不是更强的模型,是<b>一层看得见、拦得住、解释得清的人机接口</b>。我们在做这一层。',
+    foot_legal:'© 2026 mouseAI · v0 "kàndǒng" · <a href="#">GitHub</a> · <a href="#">隐私</a><br><br>made for people who didn\'t ask to learn what "<span style="color:var(--ink)">staged for commit</span>" means.',
+    anti:[
+      {h:"AI 编程助手", p:'不是。让你"不写代码"是别人的事。我们让你在 cc 已经写完之后,看懂屏幕上发生了什么。'},
+      {h:"术语词典 / 教程", p:'不是。我们不教你 git 是什么——我们告诉你"屏幕上这条具体的话,此时此刻,在说什么"。'},
+      {h:"另一个 cc 套壳", p:"不是。cc 不需要被套壳,它已经够好了。差的是一层看得见、拦得住、解释得清的人机接口。"},
+    ],
+    hot:[
+      {keys:["⌥","?"], h:"指哪解释哪", d:"主键。划选屏幕上任意一段(术语/代码/报错),按它,弹窗给你一句大白话;什么都不选直接按,它读最近的屏幕,告诉你 cc 在干嘛。",
+       ex:'"<span class="arrow">staged for commit</span>" → "已经准备好、但还没保存的修改"'},
+      {keys:["⌘","⌥","?"], h:"要详细就按它", d:"选中后按给完整解释:它是什么、为什么出现、要不要紧、该怎么办;什么都不选直接按,它会稍详细地讲整屏在干嘛。",
+       ex:'20 行报错 → "<span class="arrow">显卡内存不够,batch_size 调小</span>"'},
+      {keys:["⌘","?"], h:"看我最近卡在哪", d:"读你过去问过的东西,归纳你最近主要卡在哪几类——像一面「学习镜子」,越用越懂你。",
+       ex:'"你最近常卡在 <span class="arrow">git 分支 与 npm 依赖</span>"'},
+    ],
+    cmp_cols:["", "Copilot 类", "编程教程", "通用 ChatGPT", "mouseAI"],
+    cmp_rows:[
+      ["面向用户","会写代码的开发者","想学编程的人","所有人(含非技术)","非技术的 cc 用户"],
+      ["解决什么","帮你写代码","教你写代码","通用助手","帮你看懂 cc 在干啥"],
+      ["零 API key","no","no","no","yes"],
+      ["不上传任何内容","partial","no","no","yes"],
+      ["对接 cc 权限流","no","no","no","yes"],
+      ['"大白话"翻译',"no","partial","partial","yes"],
+    ],
+    ins:[
+      {n:"01",h:"装 Hammerspoon",p:"macOS 下免费开源的快捷键引擎。",cmd:"brew install --cask hammerspoon"},
+      {n:"02",h:"拉 mouseAI v0",p:"一行命令,放到配置目录里。",cmd:"curl -fsSL mouseai.sh/v0 | bash"},
+      {n:"03",h:"授权辅助功能",p:"系统会弹一次窗,允许读屏幕选区。",cmd:"⚙ 系统设置 → 隐私 → 辅助功能"},
+      {n:"04",h:"试一下",p:"打开终端,运行 cc,划选任意一段。",cmd:"⌥ + ?"},
+    ],
+    scenarios:{
+      explain:{label:"解释术语", kbd:"⌥?", hint:"划选下面带高亮的词,按 ⌥? 看解释",
+        title:"一句话解释",
+        body:'"<b>ahead of origin</b>" = 你本地做了 2 次提交,但还<b>没推到云端</b>。<br><br>就像写完两页日记还放在抽屉里,GitHub 那边的副本还是旧的。运行 <code>git push</code> 就能同步过去。',
+        verdict:null,
+        lines:[
+          {t:"$ npm install",c:"prompt"},{t:"npm warn deprecated",c:"warn"},
+          {t:"added 247 packages in 12s",c:""},{t:"",c:""},
+          {t:"$ git status",c:"prompt"},{t:"On branch main",c:""},
+          {t:"Your branch is ahead of 'origin/main' by 2 commits.",c:"",sel:"ahead of"},
+          {t:'  (use "git push" to publish your local commits)',c:"dim"},
+        ]},
+      permission:{label:"权限请求", kbd:"⌥?", hint:"什么都不选,直接按 ⌥?——它读屏,告诉你 cc 要干嘛、风险、该不该放行",
+        title:"它要干嘛?",
+        body:'它要 <b>删除整个 test-db 文件夹的所有内容</b>(含子文件夹)。<br><br><b>风险:</b>不可恢复。路径错了或里面有真数据就救不回来。<br><br><b>建议:</b>先 <code>ls /var/lib/test-db/</code> 看一眼里面是什么。',
+        verdict:{kind:"warn", t:"⚠  危险操作 · 建议谨慎放行"},
+        lines:[
+          {t:"> 帮我把测试数据库的旧记录清掉",c:"prompt"},{t:"",c:""},
+          {t:"⏺ 我会运行下面这条命令来清理:",c:"cc"},{t:"",c:""},
+          {t:"  Bash command",c:"dim"},
+          {t:"  rm -rf /var/lib/test-db/*",c:"",sel:"rm -rf /var/lib/test-db/*"},{t:"",c:""},
+          {t:"  Do you want to proceed?",c:""},{t:"  ❯ 1. Yes",c:""},
+          {t:"    2. No, tell Claude what to do",c:"dim"},
+        ]},
+      error:{label:"看懂报错", kbd:"⌥?", hint:"红色一片不知道哪行重要?选中按 ⌥? 看懂(要更详细按 ⌘⌥?)",
+        title:"这报错说啥",
+        body:'<b>显卡内存不够了。</b><br><br>你的显卡共 8GB,已被占 7.2GB,要再分 2.5GB 装不下。<br><br><b>常见解决:</b>把 <code>batch_size</code> 调小一半,或重启脚本释放没回收的内存。',
+        verdict:null,
+        lines:[
+          {t:"$ python train.py --epochs 10",c:"prompt"},
+          {t:"Traceback (most recent call last):",c:"err"},
+          {t:'  File "train.py", line 42, in <module>',c:"err"},
+          {t:"    model = load_model(checkpoint)",c:"err"},
+          {t:"RuntimeError: CUDA out of memory. Tried to allocate",c:"err",sel:"CUDA out of memory"},
+          {t:"  2.50 GiB (GPU 0; 8.00 GiB total capacity;",c:"err"},
+          {t:"  7.21 GiB already allocated; 0 bytes free)",c:"err"},
+        ]},
+    },
+    esc:"来自本机 Claude Code · 不上传任何内容", popClose:"esc 关闭",
+    retrigger:"再触发一次", hideTip:"隐藏弹窗",
+  },
+  en: {
+    nav_why:"Why", nav_how:"How", nav_compare:"Compare", nav_install:"Install", nav_cta:"Install now →",
+    hero_eyebrow:"v0 · kàndǒng · open beta",
+    hero_h1:'Point at anything,<br><span class="hl">get it explained</span>.<br><span class="strike">No more clueless “continue”</span>.',
+    hero_sub:'<b>mouseAI</b> is a mouse agent for non-technical people. In Claude Code, select anything you don’t understand and hit a hotkey for a plain-words explanation — <b>instant for common ones, a few seconds otherwise</b>. When cc wants to run something, it tells you what it does, the risk, and whether to allow it.',
+    hero_cta1:"Copy install command →", hero_cta2:"See how it works",
+    hero_meta:'Uses your local <span class="kbd-inline">Claude Code</span> · zero API keys · zero uploads',
+    why_label:"Why mouseAI",
+    why_h2:'Not a new AI — a <span class="mk">handle you can see</span>',
+    why_p:'For non-technical people, the hard part of using cc isn’t “getting it done” — it’s <b>not knowing what just happened on screen</b>. That’s the layer we add.',
+    answer_h:'cc’s translator + gatekeeper',
+    answer_p:'It doesn’t write your code or make your decisions — it just makes sure you <b>always know what you’re saying yes to</b>.',
+    answer_cta:"See the 3 uses →",
+    how_label:"How it works · 3 hotkeys",
+    how_h2:"Once it’s set up, you only remember three keys.",
+    how_p:"No panel, no sidebar, no website to log into. It lives in your terminal’s hotkeys — press one when you need it.",
+    cmp_label:"How we’re different",
+    cmp_h2:"We’re not fighting for the same user.",
+    cmp_p:'Other AI tools assume you “want to do something.” We assume you’re “already doing it, but need to understand it.”',
+    ins_label:"Install · macOS",
+    ins_h2:"Four steps, five minutes, no signup.",
+    ins_p:"Needs Claude Code already installed and logged in (any plan). v0 is macOS-only for now; Linux/Windows on the way.",
+    priv_h:"Local-first · nothing on your screen is uploaded",
+    priv_p:'By default every explanation goes through your own logged-in Claude Code — no servers, no API keys, no accounts, nothing leaves your machine. Uninstalling is deleting one .lua file.<br><span style="opacity:.65">Want it faster? Optionally bring your own API key for a cloud model — off by default; only then does anything go to the cloud.</span>',
+    priv_s1:"servers", priv_s2:"API keys", priv_s3:"accounts",
+    foot_p:'When non-technical people use AI coding tools, what’s missing isn’t a smarter model — it’s <b>a human layer you can see, stop, and understand</b>. We’re building that layer.',
+    foot_legal:'© 2026 mouseAI · v0 "kàndǒng" · <a href="#">GitHub</a> · <a href="#">Privacy</a><br><br>made for people who didn\'t ask to learn what "<span style="color:var(--ink)">staged for commit</span>" means.',
+    anti:[
+      {h:"An AI coding assistant", p:'Nope. Helping you “not write code” is someone else’s job. We help you understand what happened after cc already wrote it.'},
+      {h:"A glossary / tutorial", p:'Nope. We don’t teach you what git is — we tell you what this exact line, right now, on your screen, means.'},
+      {h:"Another cc wrapper", p:"Nope. cc doesn’t need wrapping — it’s good enough. What’s missing is a layer you can see, stop, and understand."},
+    ],
+    hot:[
+      {keys:["⌥","?"], h:"Point, and get it", d:"The main key. Select anything (a term, code, an error) and press it for a one-line plain explanation. Select nothing and press it — it reads your recent screen and tells you what cc is doing.",
+       ex:'"<span class="arrow">staged for commit</span>" → "changes that are ready but not saved yet"'},
+      {keys:["⌘","⌥","?"], h:"Press for detail", d:"Select then press for the full picture: what it is, why it showed up, whether it matters, what to do. Select nothing and press — it walks you through the whole screen in a bit more detail.",
+       ex:'20-line error → "<span class="arrow">GPU out of memory, lower batch_size</span>"'},
+      {keys:["⌘","?"], h:"What I keep getting stuck on", d:"Reads what you’ve asked before and groups it into the few things you get stuck on most — a learning mirror that gets to know you.",
+       ex:'"Lately you keep tripping on <span class="arrow">git branches & npm deps</span>"'},
+    ],
+    cmp_cols:["", "Copilot-like", "Tutorials", "General ChatGPT", "mouseAI"],
+    cmp_rows:[
+      ["For whom","Developers who code","People learning to code","Everyone","Non-technical cc users"],
+      ["Solves what","Writes code for you","Teaches you to code","General assistant","Helps you read what cc is doing"],
+      ["Zero API key","no","no","no","yes"],
+      ["Uploads nothing","partial","no","no","yes"],
+      ["Hooks cc’s permission flow","no","no","no","yes"],
+      ["Plain-words translation","no","partial","partial","yes"],
+    ],
+    ins:[
+      {n:"01",h:"Install Hammerspoon",p:"A free, open-source hotkey engine for macOS.",cmd:"brew install --cask hammerspoon"},
+      {n:"02",h:"Pull mouseAI v0",p:"One line, drops into your config folder.",cmd:"curl -fsSL mouseai.sh/v0 | bash"},
+      {n:"03",h:"Grant Accessibility",p:"macOS asks once, to let it read your selection.",cmd:"⚙ Settings → Privacy → Accessibility"},
+      {n:"04",h:"Try it",p:"Open a terminal, run cc, select anything.",cmd:"⌥ + ?"},
+    ],
+    scenarios:{
+      explain:{label:"Explain a term", kbd:"⌥?", hint:"Select the highlighted phrase, press ⌥? to see the explanation",
+        title:"In one line",
+        body:'"<b>ahead of origin</b>" = you made 2 commits locally but <b>haven’t pushed them to the cloud</b>.<br><br>Like writing two diary pages but leaving them in a drawer — GitHub’s copy is still old. Run <code>git push</code> to sync.',
+        verdict:null,
+        lines:[
+          {t:"$ npm install",c:"prompt"},{t:"npm warn deprecated",c:"warn"},
+          {t:"added 247 packages in 12s",c:""},{t:"",c:""},
+          {t:"$ git status",c:"prompt"},{t:"On branch main",c:""},
+          {t:"Your branch is ahead of 'origin/main' by 2 commits.",c:"",sel:"ahead of"},
+          {t:'  (use "git push" to publish your local commits)',c:"dim"},
+        ]},
+      permission:{label:"Permission ask", kbd:"⌥?", hint:"Select nothing, just press ⌥? — it reads the screen and tells you what cc wants, the risk, and whether to allow",
+        title:"What does it want?",
+        body:'It wants to <b>delete everything inside the test-db folder</b> (including subfolders).<br><br><b>Risk:</b> not recoverable. Wrong path or real data inside = gone.<br><br><b>Suggestion:</b> run <code>ls /var/lib/test-db/</code> first to see what’s in there.',
+        verdict:{kind:"warn", t:"⚠  Risky · allow with caution"},
+        lines:[
+          {t:"> clear out the old records in the test database",c:"prompt"},{t:"",c:""},
+          {t:"⏺ I’ll run this command to clean up:",c:"cc"},{t:"",c:""},
+          {t:"  Bash command",c:"dim"},
+          {t:"  rm -rf /var/lib/test-db/*",c:"",sel:"rm -rf /var/lib/test-db/*"},{t:"",c:""},
+          {t:"  Do you want to proceed?",c:""},{t:"  ❯ 1. Yes",c:""},
+          {t:"    2. No, tell Claude what to do",c:"dim"},
+        ]},
+      error:{label:"Read an error", kbd:"⌥?", hint:"A wall of red? Select it, press ⌥? (or ⌘⌥? for more detail)",
+        title:"What this error means",
+        body:'<b>Your GPU ran out of memory.</b><br><br>It has 8GB total, 7.2GB is already used, and it can’t fit another 2.5GB.<br><br><b>Common fix:</b> halve <code>batch_size</code>, or restart the script to free memory that wasn’t released.',
+        verdict:null,
+        lines:[
+          {t:"$ python train.py --epochs 10",c:"prompt"},
+          {t:"Traceback (most recent call last):",c:"err"},
+          {t:'  File "train.py", line 42, in <module>',c:"err"},
+          {t:"    model = load_model(checkpoint)",c:"err"},
+          {t:"RuntimeError: CUDA out of memory. Tried to allocate",c:"err",sel:"CUDA out of memory"},
+          {t:"  2.50 GiB (GPU 0; 8.00 GiB total capacity;",c:"err"},
+          {t:"  7.21 GiB already allocated; 0 bytes free)",c:"err"},
+        ]},
+    },
+    esc:"From your local Claude Code · nothing uploaded", popClose:"esc to close",
+    retrigger:"Trigger again", hideTip:"Hide popup",
+  }
+};
+
+let lang = (navigator.language||"").toLowerCase().startsWith("en") ? "en" : "cn";
+let scenario = "explain";
+let triggered = false;
+let trigTimer = null;
+
+const $ = (s)=>document.querySelector(s);
+const T = ()=>I18N[lang];
+
+function escSel(txt, sel, on){
+  const i = txt.indexOf(sel);
+  if(i<0) return escHtml(txt);
+  return escHtml(txt.slice(0,i)) + `<span class="${on?'sel':''}">${escHtml(sel)}</span>` + escHtml(txt.slice(i+sel.length));
+}
+function escHtml(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function renderDemo(){
+  const sc = T().scenarios[scenario];
+  $("#termTitle").textContent = "~ / claude-code · " + sc.label;
+  // body
+  let html = "";
+  sc.lines.forEach((ln,idx)=>{
+    const inner = ln.sel ? escSel(ln.t, ln.sel, triggered) : (ln.t ? escHtml(ln.t) : "&nbsp;");
+    html += `<div class="line"><span class="${ln.c||''}">${inner}</span>${idx===sc.lines.length-1?'<span class="caret"></span>':''}</div>`;
+  });
+  // popup
+  const v = sc.verdict ? `<div class="verdict ${sc.verdict.kind}">${sc.verdict.t}</div>` : "";
+  html += `<div class="popup ${triggered?'show':''}">
+    <div class="pop-head"><div class="pop-title"><span class="pulse"></span>${sc.title}</div><div class="pop-close">${T().popClose}</div></div>
+    <div>${sc.body}</div>${v}
+    <div class="esc">${T().esc}</div></div>`;
+  $("#termBody").innerHTML = html;
+  $("#demoHint").textContent = "→ " + sc.hint;
+}
+
+function renderControls(){
+  const sc = T().scenarios;
+  let html = "";
+  Object.keys(sc).forEach(k=>{
+    html += `<button class="pill ${k===scenario?'active':''}" data-sc="${k}">${sc[k].label}<span class="kbd">${sc[k].kbd}</span></button>`;
+  });
+  html += `<button class="pill" id="retrig" style="margin-left:auto">${triggered?T().hideTip:T().retrigger}</button>`;
+  $("#demoControls").innerHTML = html;
+  document.querySelectorAll("#demoControls .pill[data-sc]").forEach(b=>{
+    b.onclick = ()=>{ scenario = b.dataset.sc; trigger(); };
+  });
+  $("#retrig").onclick = ()=>{ triggered=!triggered; renderDemo(); renderControls(); };
+}
+
+function trigger(){
+  triggered = false; renderDemo(); renderControls();
+  clearTimeout(trigTimer);
+  trigTimer = setTimeout(()=>{ triggered=true; renderDemo(); renderControls(); }, 650);
+}
+
+function applyLang(){
+  document.documentElement.lang = (lang==="en"?"en":"zh-CN");
+  document.querySelectorAll("[data-i18n]").forEach(el=>{
+    const v = T()[el.getAttribute("data-i18n")];
+    if(v!=null) el.innerHTML = v;
+  });
+  // anti cards
+  $("#antiGrid").innerHTML = T().anti.map(a=>
+    `<div class="anti-card"><div class="kill">✕</div><h3>${a.h}</h3><p>${a.p}</p></div>`).join("");
+  // hotkey cards
+  $("#hotkeyGrid").innerHTML = T().hot.map(c=>{
+    const keys = c.keys.map((k,j)=>`<span class="key ${j===c.keys.length-1?'accent':''}">${k}</span>`).join("");
+    return `<div class="hotkey-card"><div class="hotkey">${keys}</div><h3>${c.h}</h3><div class="desc">${c.d}</div><div class="example">${c.ex}</div></div>`;
+  }).join("");
+  // comparison
+  const mark = (v)=> v==="yes"?'<span class="mark yes">●</span>': v==="no"?'<span class="mark no">○</span>': v==="partial"?'<span class="mark partial">◐</span>': v;
+  const cols = T().cmp_cols, rows = T().cmp_rows;
+  let ct = "<thead><tr>" + cols.map((c,i)=>`<th class="${i===cols.length-1?'us':''}">${c}</th>`).join("") + "</tr></thead><tbody>";
+  ct += rows.map(r=>"<tr>"+r.map((cell,j)=>`<td class="${j===0?'row-label':''} ${j===r.length-1?'us':''}">${mark(cell)}</td>`).join("")+"</tr>").join("");
+  ct += "</tbody>";
+  $("#compTable").innerHTML = ct;
+  // install
+  $("#installGrid").innerHTML = T().ins.map(s=>
+    `<div class="step"><div class="num">STEP ${s.n}</div><h4>${s.h}</h4><p>${s.p}</p><div class="cmd">${s.cmd}</div></div>`).join("");
+  // lang toggle label
+  $("#langToggle").innerHTML = lang==="cn" ? '<b>中</b> / EN' : '中 / <b>EN</b>';
+  renderControls(); renderDemo();
+}
+
+$("#langToggle").onclick = ()=>{ lang = lang==="cn"?"en":"cn"; applyLang(); };
+applyLang();
+trigger();
+</script>
+</body>
+</html>

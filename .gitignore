@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Claude Code 本地配置 / 状态
+.claude/
+
+# 卡点日志 / 自动放行日志 —— 含终端活动片段,绝不公开
+v0-kandong/logs/
+
+# 备份 / 测试数据
+*.bak
+*.bak.*
+*.testdata.*
+
+# 内部策略 / 产品笔记 —— 不公开
+竞品分析-看懂.md
+*鼠标Agent.md
