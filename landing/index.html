@@ -191,6 +191,20 @@
   .step .cmd{margin-top:10px; font-family:"JetBrains Mono"; font-size:11px; background:var(--bg);
     border:1px solid var(--line); border-radius:6px; padding:6px 8px; color:var(--ink);
     word-break:break-all; line-height:1.5}
+  /* 省事路径:让 cc 一键装 */
+  .fast-path{background:#fbd02e1a; border:1px solid #fbd02e80; border-radius:14px; padding:20px 22px; margin-bottom:24px}
+  .fast-head{display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+  .fast-badge{font-family:"JetBrains Mono"; font-size:11px; font-weight:600; letter-spacing:.04em;
+    text-transform:uppercase; background:var(--accent); color:var(--accent-ink); padding:3px 8px; border-radius:6px}
+  .fast-title{font-size:17px; font-weight:600; color:var(--ink)}
+  .fast-desc{font-size:13px; color:var(--ink-2); line-height:1.55; margin-bottom:14px; max-width:780px}
+  .fast-prompt{display:flex; align-items:stretch; gap:10px; flex-wrap:wrap}
+  .fast-prompt code{flex:1; min-width:260px; background:#fff; border:1px solid var(--line-2); border-radius:8px;
+    padding:10px 12px; font-family:"JetBrains Mono"; font-size:12px; line-height:1.6; color:var(--ink);
+    white-space:pre-wrap; word-break:break-word}
+  .fast-copy{flex-shrink:0; background:var(--ink); color:var(--bg); border:1px solid var(--ink); border-radius:8px;
+    padding:10px 18px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; transition:transform .15s ease}
+  .fast-copy:hover{transform:translateY(-1px)}
   .privacy-banner{background:var(--ink); color:var(--bg); border-radius:16px; padding:32px;
     display:flex; align-items:center; gap:24px; flex-wrap:wrap}
   .privacy-banner .icon{width:56px; height:56px; border-radius:14px; background:var(--accent);
@@ -310,6 +324,17 @@
     <h2 data-i18n="ins_h2"></h2>
     <p data-i18n="ins_p"></p>
   </div>
+  <div class="fast-path">
+    <div class="fast-head">
+      <span class="fast-badge" data-i18n="ins_fast_badge"></span>
+      <span class="fast-title" data-i18n="ins_fast_title"></span>
+    </div>
+    <p class="fast-desc" data-i18n="ins_fast_desc"></p>
+    <div class="fast-prompt">
+      <code id="ccPromptText" data-i18n="ccPrompt"></code>
+      <button class="fast-copy" id="ccFullCopy" data-i18n="ins_fast_copy"></button>
+    </div>
+  </div>
   <div class="install-grid" id="installGrid"></div>
   <div class="privacy-banner">
     <div class="icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
@@ -345,8 +370,12 @@ const I18N = {
     hero_sub:'给不懂技术的人用。在 Claude Code 里划选看不懂的东西、按下快捷键,<b>几秒内大白话讲清</b>;cc 要动手时,告诉你它要干嘛、有没有风险、该不该放行。<b>它还有记忆——记住你常卡的地方,帮你总结学到了什么。</b>',
     hero_cta1:"让 cc 帮你装 →", hero_cta2:"先看看怎么用",
     hero_meta:'复用本机 <span class="kbd-inline">Claude Code</span> · 零 API key · 零上传',
-    ccPrompt:"帮我装一下 mouseAI(看懂):在终端运行 curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash ,装好后告诉我那三个快捷键怎么用。",
+    ccPrompt:"帮我在 macOS 上装 mouseAI(看懂):\n1) 运行 brew install --cask hammerspoon\n2) 运行 curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash\n3) 打开 Hammerspoon,再帮我打开「系统设置 → 隐私与安全性 → 辅助功能」,告诉我把哪个开关打开(这步只能我自己点)。\n装好后告诉我 ⌥? / ⌘⌥? / ⌘? 三个快捷键怎么用。",
     ccCopied:"✓ 已复制,粘给你的 cc",
+    ins_fast_badge:"省事路径",
+    ins_fast_title:"让 cc 一句话帮你装",
+    ins_fast_desc:"已经在用 Claude Code?把这段发给它,前两步它来跑;第 3 步「辅助功能」是 macOS 的安全开关,只能你手动点一下(cc 会带你到设置页)。想分步看清,就用下面的步骤。",
+    ins_fast_copy:"复制这段 →",
     why_label:"为什么是 mouseAI",
     why_h2:'不是新 AI,是给你一个<span class="mk">看得见的把手</span>',
     why_p:'非技术的人用 cc 最大的问题不是"做不出来",是<b>不知道刚才那一屏到底是怎么回事</b>。我们补的是这一层。',
@@ -443,8 +472,12 @@ const I18N = {
     hero_sub:'For non-technical people. In Claude Code, select anything you don’t get and hit a hotkey — <b>plain words in seconds</b>. When cc wants to act, it tells you what it does, the risk, and whether to allow it. <b>It has memory too — it remembers what trips you up and sums up what you’ve learned.</b>',
     hero_cta1:"Tell your cc to install it →", hero_cta2:"See how it works",
     hero_meta:'Uses your local <span class="kbd-inline">Claude Code</span> · zero API keys · zero uploads',
-    ccPrompt:"Install mouseAI for me: run curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash , then tell me the three hotkeys.",
+    ccPrompt:"Install mouseAI on macOS for me:\n1) run brew install --cask hammerspoon\n2) run curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash\n3) open Hammerspoon, then open System Settings → Privacy & Security → Accessibility and tell me which toggle to turn on (only I can click this).\nThen tell me how to use the three hotkeys ⌥? / ⌘⌥? / ⌘?.",
     ccCopied:"✓ Copied — paste it to your cc",
+    ins_fast_badge:"Fast path",
+    ins_fast_title:"Let your cc install it in one message",
+    ins_fast_desc:"Already in Claude Code? Paste this to it — it runs the first two steps. Step 3 (Accessibility) is a macOS switch only you can flip (cc will take you to the settings page). Prefer it step by step? Use the steps below.",
+    ins_fast_copy:"Copy this →",
     why_label:"Why mouseAI",
     why_h2:'Not a new AI — a <span class="mk">handle you can see</span>',
     why_p:'For non-technical people, the hard part of using cc isn’t “getting it done” — it’s <b>not knowing what just happened on screen</b>. That’s the layer we add.',
@@ -634,6 +667,17 @@ trigger();
     setTimeout(()=>{ cta.innerHTML = T().hero_cta1; }, 2400);
     const ins = document.getElementById("install");
     if(ins) ins.scrollIntoView({behavior:"smooth"});
+  });
+})();
+
+// 安装区「省事路径」的复制按钮:复制完整 cc 安装指令
+(function(){
+  const btn = document.getElementById("ccFullCopy");
+  if(!btn) return;
+  btn.addEventListener("click", ()=>{
+    if(navigator.clipboard){ navigator.clipboard.writeText(T().ccPrompt).catch(()=>{}); }
+    btn.innerHTML = T().ccCopied;
+    setTimeout(()=>{ btn.innerHTML = T().ins_fast_copy; }, 2400);
   });
 })();
 </script>
