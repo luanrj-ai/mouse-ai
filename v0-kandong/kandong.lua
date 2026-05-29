@@ -8,7 +8,10 @@
 local home       = os.getenv("HOME")
 local claudePath = home .. "/.local/bin/claude"
 local selFile    = "/tmp/kandong_sel.txt"
-local logFile    = home .. "/Desktop/mouse-ai/v0-kandong/logs/confusions.jsonl"
+-- 卡点日志放通用位置(跟 key 同目录),不依赖项目路径——装到哪台机器都能记。
+local logDir     = home .. "/.config/kandong/logs"
+local logFile    = logDir .. "/confusions.jsonl"
+os.execute('mkdir -p "' .. logDir .. '"')
 local MAX_CHARS  = 6000
 
 -- 云端中转(OpenAI 兼容)配置:key/base 放仓库外、仅本人可读(chmod 600),代码不硬编码。
