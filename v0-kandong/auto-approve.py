@@ -16,7 +16,12 @@
 
 import sys, json, re, shlex, os, time
 
-LOG = os.path.expanduser("~/Desktop/mouse-ai/v0-kandong/logs/auto-approve.jsonl")
+# 日志放通用位置(跟 kandong.lua 同目录),不依赖项目路径——装到哪台机器都能记。
+LOG = os.path.expanduser("~/.config/kandong/logs/auto-approve.jsonl")
+try:
+    os.makedirs(os.path.dirname(LOG), exist_ok=True)
+except Exception:
+    pass
 
 
 def emit(decision, reason, cmd):

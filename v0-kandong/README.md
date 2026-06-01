@@ -43,7 +43,7 @@ cc 每次要执行命令前,`auto-approve.py` 会先判断风险:
 安全设计:命令里只要有可能"夹带"危险的拼接(`;` `&&` `>` 等),一律不自动放行;
 `ls && rm -rf ~` 这种不会因开头是 `ls` 就被放过,会走正常询问。
 
-**透明可查**:每次自动放行/提醒都记在 `logs/auto-approve.jsonl`,你能随时回看它替你做了什么决定。
+**透明可查**:每次自动放行/提醒都记在 `~/.config/kandong/logs/auto-approve.jsonl`,你能随时回看它替你做了什么决定。
 
 **激活**:改了 cc 配置后需**重启 Claude Code**(退出再进)才生效。
 **调整范围**:编辑 `auto-approve.py` 里的 `READONLY` / `SAFE_PROJECT` / `RISKY` 列表。
@@ -65,8 +65,20 @@ Hammerspoon 需要"辅助功能"权限才能模拟复制和监听快捷键:
 
 ## 它记录了什么(你的数据飞轮)
 
-每次解释,会往 `logs/confusions.jsonl` 追加一行:时间、quick/deep、选中字数、前 100 字预览。
+每次解释,会往 `~/.config/kandong/logs/confusions.jsonl` 追加一行:时间、quick/deep、选中字数、前 100 字预览。
 **不记录解释结果,只记录"你看不懂什么"**——这是以后做个性化、做护城河的原料。
+**这个日志只在用户本机,不上传。**
+
+## 匿名使用心跳(算"留存"用)
+
+为了知道"装了之后还有没有人在用"(留存),按快捷键时会发一个极克制的事件:
+- **发的内容**:一串**随机匿名码**(本机生成、存在 `~/.config/kandong/anon_id`,跟用户是谁/设备无关)、事件名(`installed` / `used`)、日期、版本、系统。
+- **绝不发**:任何选中内容、屏幕文字、文件名、路径。
+- **频率**:装机发一次 `installed`;之后**每天首次使用**发一次 `used`(够算留存,不刷量)。
+- **怎么关**(即时生效、不用重载):`touch ~/.config/kandong/telemetry.off`
+
+**开启方法(给作者)**:去 [PostHog](https://posthog.com) 建个免费项目,把 **Project API Key** 填进 `kandong.lua` 顶部的 `POSTHOG_KEY`(EU 区项目改 `POSTHOG_HOST`)。
+**没填 key 时,这段完全是 no-op,什么都不发**——所以默认空着、提交进仓库也安全。PostHog 直接出留存曲线,你不用自己维护数据库。
 
 ## 卸载
 

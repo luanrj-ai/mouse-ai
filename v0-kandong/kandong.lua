@@ -14,6 +14,64 @@ local logFile    = logDir .. "/confusions.jsonl"
 os.execute('mkdir -p "' .. logDir .. '"')
 local MAX_CHARS  = 6000
 
+-- ===== 匿名使用心跳(只为算"留存":装了之后还有没有人在持续用)=====
+-- 发出去的只有:一串随机匿名码 + 事件名(installed/used) + 日期 + 版本/系统。
+-- 绝不发任何选中内容、屏幕文字、文件名、路径。
+-- 默认开;想关 = 建个空文件即可,即时生效、不用重载:
+--     touch ~/.config/kandong/telemetry.off
+-- 安全兜底:POSTHOG_KEY 为空时整段是 no-op(什么都不发),所以提交进仓库也安全。
+local POSTHOG_KEY  = ""                          -- 建好免费 PostHog 项目后,把 Project API Key 贴这(公开写入 key,可提交)
+local POSTHOG_HOST = "https://us.i.posthog.com"  -- 项目在 EU 区就改 https://eu.i.posthog.com
+local cfgDir       = home .. "/.config/kandong"
+local anonIdFile   = cfgDir .. "/anon_id"
+local teleStateF   = cfgDir .. "/telemetry_state"   -- 记最近一次发 used 的日期(每天最多发一次)
+local teleOffFile  = cfgDir .. "/telemetry.off"
+
+local function teleEnabled()
+  if POSTHOG_KEY == "" then return false end
+  local f = io.open(teleOffFile, "r"); if f then f:close(); return false end
+  return true
+end
+
+-- 取/生成匿名码。返回 (id, 是不是刚新建)。刚新建 = 这台机器第一次跑(用来发 installed)。
+local function anonId()
+  local f = io.open(anonIdFile, "r")
+  if f then local id = (f:read("*a") or ""):gsub("%s", ""); f:close(); if #id > 0 then return id, false end end
+  local id = (hs.host and hs.host.uuid and hs.host.uuid()) or nil
+  if not id then
+    local t = {}; for i = 1, 32 do t[i] = string.format("%x", math.random(0, 15)) end; id = table.concat(t)
+  end
+  local w = io.open(anonIdFile, "w"); if w then w:write(id); w:close() end
+  return id, true
+end
+
+local function teleSend(event)
+  local id = anonId()
+  local body = hs.json.encode({
+    api_key = POSTHOG_KEY, event = event, distinct_id = id,
+    properties = { ["$lib"] = "kandong", version = "v0", os = "macos" },
+    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+  })
+  hs.http.asyncPost(POSTHOG_HOST .. "/capture/", body,
+    { ["Content-Type"] = "application/json" }, function() end)  -- 成败都不管,绝不卡界面
+end
+
+-- 每次按快捷键调一下:首次安装发 installed;之后每天首次使用发一次 used(够算留存)。
+local function heartbeat()
+  pcall(function()
+    if not teleEnabled() then return end
+    local _, isNew = anonId()
+    if isNew then teleSend("installed") end
+    local today = os.date("!%Y-%m-%d")
+    local last = ""
+    local f = io.open(teleStateF, "r"); if f then last = (f:read("*a") or ""):gsub("%s", ""); f:close() end
+    if last ~= today then
+      local w = io.open(teleStateF, "w"); if w then w:write(today); w:close() end
+      teleSend("used")
+    end
+  end)
+end
+
 -- 云端中转(OpenAI 兼容)配置:key/base 放仓库外、仅本人可读(chmod 600),代码不硬编码。
 -- 词典未命中的 quick 走中转 gpt-5-low(实测 ~2-3s,远快于 claude -p 的 9-25s);
 -- 中转失败自动兜底回本机 claude -p(免费登录),保证总有答案。有 key 才启用。
@@ -522,6 +580,7 @@ end
 
 -- ⌘?:智能键。选中了 → 解释那段;没选中 → 读最近屏幕,有权限请求就解释+风险,否则总结。
 local function smart()
+  heartbeat()
   withSelection(function(sel)
     if sel and #sel > 0 then
       runClaude(sel, "quick")
@@ -543,6 +602,7 @@ end
 
 -- ⌘⌥?:详细版智能键。选中了→详细解释那段;没选中→读屏,稍详细解释整屏在干嘛。
 local function smartDeep()
+  heartbeat()
   withSelection(function(sel)
     if sel and #sel > 0 then
       runClaude(sel, "deep")
@@ -559,6 +619,7 @@ end
 
 -- ⌘?:读卡点日志,归纳"你最近主要卡在哪几类"
 local function summarize()
+  heartbeat()
   local items = {}
   local f = io.open(logFile, "r")
   if f then
