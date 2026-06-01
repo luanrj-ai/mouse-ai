@@ -20,7 +20,7 @@ local MAX_CHARS  = 6000
 -- 默认开;想关 = 建个空文件即可,即时生效、不用重载:
 --     touch ~/.config/kandong/telemetry.off
 -- 安全兜底:POSTHOG_KEY 为空时整段是 no-op(什么都不发),所以提交进仓库也安全。
-local POSTHOG_KEY  = ""                          -- 建好免费 PostHog 项目后,把 Project API Key 贴这(公开写入 key,可提交)
+local POSTHOG_KEY  = "phc_BSyxvEdp6arPfeKC73gKzqajb7D79LqUmSWVJVPoQZ5F"  -- 公开写入 key,可提交
 local POSTHOG_HOST = "https://us.i.posthog.com"  -- 项目在 EU 区就改 https://eu.i.posthog.com
 local cfgDir       = home .. "/.config/kandong"
 local anonIdFile   = cfgDir .. "/anon_id"
