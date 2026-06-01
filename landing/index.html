@@ -216,6 +216,24 @@
   .privacy-banner .stat .n{font-family:"JetBrains Mono"; font-size:24px; font-weight:600; color:var(--accent)}
   .privacy-banner .stat .l{font-size:11px; color:#ffffff80}
 
+  /* safety faq */
+  .faq-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .faq-item{background:#fff; border:1px solid var(--line-2); border-radius:14px; padding:22px 24px}
+  .faq-item.lead{grid-column:1 / -1; background:var(--ink); color:var(--bg); border-color:var(--ink)}
+  .faq-item .q{font-size:16px; font-weight:600; margin-bottom:9px; line-height:1.4;
+    display:flex; align-items:flex-start; gap:9px; color:var(--ink)}
+  .faq-item.lead .q{color:var(--accent)}
+  .faq-item .q .qmark{flex-shrink:0; width:22px; height:22px; border-radius:6px; margin-top:1px;
+    background:var(--bg-2); color:var(--ink-2); display:grid; place-items:center;
+    font-family:"JetBrains Mono"; font-size:12px; font-weight:600}
+  .faq-item.lead .q .qmark{background:var(--accent); color:var(--accent-ink)}
+  .faq-item .a{font-size:14px; line-height:1.62; color:var(--ink-2)}
+  .faq-item.lead .a{color:#ffffffcc}
+  .faq-item .a b{color:var(--ink)} .faq-item.lead .a b{color:#fff}
+  .faq-item .a code{font-family:"JetBrains Mono"; font-size:12px; background:var(--bg);
+    border:1px solid var(--line); border-radius:5px; padding:1px 5px; color:var(--ink)}
+  .faq-item.lead .a code{background:#ffffff1a; border-color:#ffffff22; color:var(--accent)}
+
   footer{padding:60px 0 40px; border-top:1px solid var(--line); margin-top:80px}
   footer .inner{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:24px}
   footer p{font-size:13px; color:var(--ink-3); line-height:1.6; max-width:380px}
@@ -224,7 +242,7 @@
 
   @media(max-width:960px){
     .hero-grid{grid-template-columns:1fr}
-    .anti-grid,.hotkey-grid{grid-template-columns:1fr}
+    .anti-grid,.hotkey-grid,.faq-grid{grid-template-columns:1fr}
     .install-grid{grid-template-columns:1fr 1fr}
     .answer-card{grid-template-columns:auto 1fr}
     .privacy-banner .stat{margin-left:0}
@@ -247,6 +265,7 @@
       <a href="#why" data-i18n="nav_why"></a>
       <a href="#how" data-i18n="nav_how"></a>
       <a href="#compare" data-i18n="nav_compare"></a>
+      <a href="#safety" data-i18n="nav_safety"></a>
       <button class="lang" id="langToggle"></button>
       <a class="btn" href="#install" data-i18n="nav_cta"></a>
     </div>
@@ -349,6 +368,16 @@
   </div>
 </div></section>
 
+<!-- SAFETY -->
+<section class="section" id="safety"><div class="wrap">
+  <div class="section-head">
+    <div class="label" data-i18n="saf_label"></div>
+    <h2 data-i18n="saf_h2"></h2>
+    <p data-i18n="saf_p"></p>
+  </div>
+  <div class="faq-grid" id="faqGrid"></div>
+</div></section>
+
 <footer><div class="wrap inner">
   <div>
     <div class="brand" style="margin-bottom:12px">
@@ -363,7 +392,7 @@
 <script>
 const I18N = {
   cn: {
-    nav_why:"为什么", nav_how:"怎么用", nav_compare:"对比", nav_cta:"立即安装 →",
+    nav_why:"为什么", nav_how:"怎么用", nav_compare:"对比", nav_safety:"安全", nav_cta:"立即安装 →",
     hero_eyebrow:"v0 · 看懂 · 已开放试用",
     hero_h1:'在终端里<span class="hl">指哪解释哪</span>。<br>不用切窗口、<br><span class="strike">不用稀里糊涂点继续</span>。',
     hero_sub:'给不懂技术的人用。在 Claude Code 里划选看不懂的东西、按下快捷键,<b>几秒内大白话讲清</b>;cc 要动手时,告诉你它要干嘛、有没有风险、该不该放行。<b>它还有记忆——记住你常卡的地方,帮你总结学到了什么。</b>',
@@ -390,11 +419,11 @@ const I18N = {
     ins_label:"安装 · macOS",
     ins_h2:"一句话,交给 cc 装好。",
     ins_p:"需要本机已经装好并登录过 Claude Code(任意 plan)。v0 目前只跑 macOS,Linux/Windows 在路上。",
-    priv_h:"本地优先 · 不上传任何屏幕内容",
-    priv_p:'默认所有解释都通过你自己已经登录的 Claude Code 发出,我们这边没有服务器、没有 API key、没有账号系统,屏幕内容不出本机。卸载就是删一个 .lua 文件。<br><span style="opacity:.65">想更快?可选配你自己的 API key 接云端模型——默认关闭,开了才会走云端。</span>',
-    priv_s1:"服务器", priv_s2:"API key", priv_s3:"账号",
+    priv_h:"用你自己的 plan · 零服务器 · 零账号 · 零留存",
+    priv_p:'解释走的是<b>你自己已经登录的 Claude Code</b>——和你平时用 cc 干活完全一样。我们这边没有服务器、不需要任何 API key、没有账号系统,你的内容<b>到不了我们手里</b>,也没法被我们存下来。卸载就是删一个 .lua 文件。',
+    priv_s1:"我们的服务器", priv_s2:"要花的 API key", priv_s3:"要注册的账号",
     foot_p:'非技术的人用 AI 编程工具时,缺的不是更强的模型,是<b>一层看得见、拦得住、解释得清的人机接口</b>。我们在做这一层。',
-    foot_legal:'© 2026 mouseAI · v0 "kàndǒng" · <a href="https://github.com/luanrj-ai/mouse-ai">GitHub</a> · <a href="#">隐私</a><br><br>made for people who didn\'t ask to learn what "<span style="color:var(--ink)">staged for commit</span>" means.',
+    foot_legal:'© 2026 mouseAI · v0 "kàndǒng" · <a href="https://github.com/luanrj-ai/mouse-ai">GitHub</a> · <a href="#safety">隐私与安全</a><br><br>made for people who didn\'t ask to learn what "<span style="color:var(--ink)">staged for commit</span>" means.',
     anti:[
       {h:"AI 编程助手", p:'不是。让你"不写代码"是别人的事。我们让你在 cc 已经写完之后,看懂屏幕上发生了什么。'},
       {h:"术语词典 / 教程", p:'不是。我们不教你 git 是什么——我们告诉你"屏幕上这条具体的话,此时此刻,在说什么"。'},
@@ -422,6 +451,18 @@ const I18N = {
       {n:"02",h:"拉 mouseAI v0",p:"一行命令,放到配置目录里。",cmd:"curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash"},
       {n:"03",h:"授权辅助功能",p:"系统会弹一次窗,允许读屏幕选区。",cmd:"⚙ 系统设置 → 隐私 → 辅助功能"},
       {n:"04",h:"试一下",p:"打开终端,运行 cc,划选任意一段。",cmd:"⌥ + ?"},
+    ],
+    saf_label:"它安全吗 · 老实说",
+    saf_h2:"在你点「安装」之前,先把话说清楚。",
+    saf_p:"装一个能读屏幕的东西,本来就该警惕。所以下面这些我们不绕弯子——代码全开源,每一条你都能自己去核对。",
+    safety:[
+      {lead:true, q:"它用我的钱吗?要再买 key 吗?", a:"不用。它就用你<b>已经登录好的那个 Claude Code</b>(你现有的 plan),不需要再花钱买任何 API key、不需要我们的服务器、不用注册账号。装完它只是你电脑里的一个本地小脚本。"},
+      {q:"它能看到我屏幕上的什么?", a:"只有两种:① 你<b>主动划选</b>的那一段文字;② 你按键当下、最前面那个窗口里的可见文字。读的是<b>文字,不是截图</b>,也不碰别的 app、你的文件或后台窗口。"},
+      {q:"我的内容会发去哪?你们收得到吗?", a:"和你平时用 Claude Code 一模一样:选中的那段交给<b>你自己的 cc</b> 去解释(即经 Anthropic)。<b>我们这边没有服务器,收不到、也存不了你的任何内容。</b>"},
+      {q:"为什么要开「辅助功能」权限?", a:"只为两件事:① 监听你按的快捷键;② 帮你按一下复制(<code>⌘C</code>)拿到选区,拿完<b>立刻把你原来的剪贴板还回去</b>。不录屏、不记键盘。"},
+      {q:"<code>curl … | bash</code> 这条命令我敢跑吗?", a:"代码全部开源,装之前可以先读。不放心就先 <code>curl</code> 下来看一眼内容,确认了再跑——或者干脆让你的 cc 帮你读完再装。"},
+      {q:"它会自动替我点「同意」吗?", a:"只对<b>只读、安全</b>的命令(看文件、看状态)自动放行;<b>危险的(删库 / sudo / 强推)不替你拦死</b>(硬拦没用,cc 会换种等效写法绕过)——而是<b>额外提醒你风险、停下来让你自己决定</b>;其余照常问你。每条决定都写进本地日志可查,不想要一行就能关。"},
+      {q:"想删干净怎么办?", a:"三步,全在你自己电脑上:删 <code>init.lua</code> 里那一行;(可选)还原 cc 的 <code>settings.json</code>;在系统设置里关掉辅助功能。<b>没有账号要注销,没有服务器留着你的数据。</b>"},
     ],
     scenarios:{
       explain:{label:"解释术语", kbd:"⌥?", hint:"划选下面带高亮的词,按 ⌥? 看解释",
@@ -465,7 +506,7 @@ const I18N = {
     retrigger:"再触发一次", hideTip:"隐藏弹窗",
   },
   en: {
-    nav_why:"Why", nav_how:"How", nav_compare:"Compare", nav_cta:"Install now →",
+    nav_why:"Why", nav_how:"How", nav_compare:"Compare", nav_safety:"Safety", nav_cta:"Install now →",
     hero_eyebrow:"v0 · kàndǒng · open beta",
     hero_h1:'Point at anything,<br><span class="hl">get it explained</span>.<br><span class="strike">No more clueless “continue”</span>.',
     hero_sub:'For non-technical people. In Claude Code, select anything you don’t get and hit a hotkey — <b>plain words in seconds</b>. When cc wants to act, it tells you what it does, the risk, and whether to allow it. <b>It has memory too — it remembers what trips you up and sums up what you’ve learned.</b>',
@@ -492,11 +533,11 @@ const I18N = {
     ins_label:"Install · macOS",
     ins_h2:"One message — your cc installs it.",
     ins_p:"Needs Claude Code already installed and logged in (any plan). v0 is macOS-only for now; Linux/Windows on the way.",
-    priv_h:"Local-first · nothing on your screen is uploaded",
-    priv_p:'By default every explanation goes through your own logged-in Claude Code — no servers, no API keys, no accounts, nothing leaves your machine. Uninstalling is deleting one .lua file.<br><span style="opacity:.65">Want it faster? Optionally bring your own API key for a cloud model — off by default; only then does anything go to the cloud.</span>',
-    priv_s1:"servers", priv_s2:"API keys", priv_s3:"accounts",
+    priv_h:"Your own plan · zero servers · zero accounts · zero retention",
+    priv_p:'Explanations go through <b>your own logged-in Claude Code</b> — exactly like you already use cc. We have no servers, need no API key, and have no accounts; <b>your content never reaches us</b> and we can’t store it. Uninstalling is deleting one .lua file.',
+    priv_s1:"of our servers", priv_s2:"API keys to buy", priv_s3:"accounts to make",
     foot_p:'When non-technical people use AI coding tools, what’s missing isn’t a smarter model — it’s <b>a human layer you can see, stop, and understand</b>. We’re building that layer.',
-    foot_legal:'© 2026 mouseAI · v0 "kàndǒng" · <a href="https://github.com/luanrj-ai/mouse-ai">GitHub</a> · <a href="#">Privacy</a><br><br>made for people who didn\'t ask to learn what "<span style="color:var(--ink)">staged for commit</span>" means.',
+    foot_legal:'© 2026 mouseAI · v0 "kàndǒng" · <a href="https://github.com/luanrj-ai/mouse-ai">GitHub</a> · <a href="#safety">Privacy &amp; Safety</a><br><br>made for people who didn\'t ask to learn what "<span style="color:var(--ink)">staged for commit</span>" means.',
     anti:[
       {h:"An AI coding assistant", p:'Nope. Helping you “not write code” is someone else’s job. We help you understand what happened after cc already wrote it.'},
       {h:"A glossary / tutorial", p:'Nope. We don’t teach you what git is — we tell you what this exact line, right now, on your screen, means.'},
@@ -524,6 +565,18 @@ const I18N = {
       {n:"02",h:"Pull mouseAI v0",p:"One line, drops into your config folder.",cmd:"curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash"},
       {n:"03",h:"Grant Accessibility",p:"macOS asks once, to let it read your selection.",cmd:"⚙ Settings → Privacy → Accessibility"},
       {n:"04",h:"Try it",p:"Open a terminal, run cc, select anything.",cmd:"⌥ + ?"},
+    ],
+    saf_label:"Is it safe · straight talk",
+    saf_h2:"Before you hit “install,” let’s be straight with you.",
+    saf_p:"Installing something that can read your screen should make you cautious. So here’s the honest version — all of it open source, every claim you can check yourself.",
+    safety:[
+      {lead:true, q:"Does it cost me money? Do I need another key?", a:"No. It uses <b>the Claude Code you’re already logged into</b> (your existing plan) — no API key to buy, no server of ours, no account to create. Once installed it’s just a small local script on your machine."},
+      {q:"What can it see on my screen?", a:"Only two things: ① the text <b>you actively select</b>; ② the visible text in the frontmost window the moment you press the key. It reads <b>text, not screenshots</b> — and never touches other apps, your files, or background windows."},
+      {q:"Where does my content go? Can you see it?", a:"Exactly like normal Claude Code use: the selected text is handed to <b>your own cc</b> to explain (i.e. via Anthropic). <b>We have no server — we can’t receive or store any of your content.</b>"},
+      {q:"Why does it need Accessibility permission?", a:"Just two things: ① to listen for your hotkeys; ② to press copy (<code>⌘C</code>) and grab your selection, then <b>immediately restore your original clipboard</b>. No screen recording, no keylogging."},
+      {q:"Can I trust <code>curl … | bash</code>?", a:"The code is fully open source — read it before installing. Not sure? <code>curl</code> it down and look first, then run it — or just have your cc read it for you before installing."},
+      {q:"Will it auto-approve things for me?", a:"Only <b>read-only, safe</b> commands (reading files, checking status) get auto-approved. <b>Dangerous ones (deleting, sudo, force-push) aren’t hard-blocked</b> (blocking is useless — cc just rephrases around it); instead it <b>flags the risk and stops to let you decide</b>. Everything else still asks. Every decision is logged locally, and one line turns it off."},
+      {q:"How do I fully remove it?", a:"Three steps, all on your own machine: delete that line in <code>init.lua</code>; (optional) restore cc’s <code>settings.json</code>; turn off Accessibility in System Settings. <b>No account to close, no server holding your data.</b>"},
     ],
     scenarios:{
       explain:{label:"Explain a term", kbd:"⌥?", hint:"Select the highlighted phrase, press ⌥? to see the explanation",
@@ -646,6 +699,9 @@ function applyLang(){
   // install
   $("#installGrid").innerHTML = T().ins.map(s=>
     `<div class="step"><div class="num">STEP ${s.n}</div><h4>${s.h}</h4><p>${s.p}</p><div class="cmd">${s.cmd}</div></div>`).join("");
+  // safety faq
+  $("#faqGrid").innerHTML = T().safety.map(f=>
+    `<div class="faq-item${f.lead?' lead':''}"><div class="q"><span class="qmark">?</span><span>${f.q}</span></div><div class="a">${f.a}</div></div>`).join("");
   // lang toggle label
   $("#langToggle").innerHTML = lang==="cn" ? '<b>中</b> / EN' : '中 / <b>EN</b>';
   renderControls(); renderDemo();

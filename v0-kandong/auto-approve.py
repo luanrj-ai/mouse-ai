@@ -3,8 +3,11 @@
 #
 # cc 每次要执行 Bash 命令前,会先把命令交给这个脚本。脚本判断:
 #   - 只看不改的命令、常见安全操作(测试/检查/查依赖) → allow(自动放行)
-#   - 极危险的(rm -rf /、sudo、curl|sh 等)            → deny(直接拦下)
+#   - 高风险的(rm -rf /、sudo、curl|sh 等)            → ask(不拦,但停下来提醒你再决定)
 #   - 其余                                             → 不表态,交给 cc 照常问用户
+#
+# 为什么高风险不直接 deny(拦下):实战里硬拦没用 —— cc 会自动换一种等效写法绕过,
+# 反而给人"被保护了"的错觉。所以这里只"提醒 + 强制停下来问你",由你看懂后自己决定。
 #
 # 关键安全设计:只要命令里有可能"夹带"副作用的 shell 拼接(; && || > < ` $( &),
 # 一律不自动放行(走正常询问),哪怕开头是 ls。纯只读命令之间的管道 | 例外放行。
@@ -54,9 +57,9 @@ def main():
         defer()
     c = cmd.strip()
 
-    # ---- 1) 极危险:直接拦下(连问都不问) ----
-    # rm 只在删"危险目标"时才拦:根 / 家目录 / 系统目录 / 通配 / --no-preserve-root。
-    # 普通 rm 某个文件、/tmp/x、项目子目录 → 不拦,交给用户问(defer)。
+    # ---- 1) 高风险:不拦,但提醒你 + 强制停下来问(ask) ----
+    # rm 只在删"危险目标"时才提醒:根 / 家目录 / 系统目录 / 通配 / --no-preserve-root。
+    # 普通 rm 某个文件、/tmp/x、项目子目录 → 不提醒,交给用户照常问(defer)。
     def danger_rm(s):
         try:
             parts = shlex.split(s)
@@ -88,18 +91,18 @@ def main():
                 return True
         return False
 
-    DENY = [
+    RISKY = [
         r":\s*\(\s*\)\s*\{",                              # fork bomb :(){
         r"\bmkfs\b", r"\bdd\b[^\n]*\bof=/dev/", r">\s*/dev/sd",
-        r"\bsudo\b",                                       # 非技术用户:sudo 一律拦
+        r"\bsudo\b",                                       # 非技术用户:sudo 一律提醒
         r"\bchmod\s+-R\s+0*777\s+/",
         r"\b(curl|wget)\b[^\n]*\|\s*(sudo\s+)?(sh|bash|zsh|python3?)\b",  # curl|sh
         r"\bgit\s+push\b[^\n]*--force",
         r"\b(shutdown|reboot|halt|poweroff)\b",
         r">\s*/etc/",
     ]
-    if danger_rm(c) or any(re.search(p, c) for p in DENY):
-        emit("deny", "看懂:这条命令风险很高,已自动拦下。确实需要的话请手动处理。", c)
+    if danger_rm(c) or any(re.search(p, c) for p in RISKY):
+        emit("ask", "看懂:⚠️ 这条命令风险较高(删数据 / 提权 / 强推之类)。不替你拦死(拦了 cc 也容易换种等效写法绕过),但先停下来提醒你:看懂这条到底干嘛,再决定放不放行。", c)
 
     # ---- 2) 判断有没有"夹带副作用"的拼接符 ----
     CHAIN = [";", "&&", "||", ">", "<", "`", "$(", "&"]
