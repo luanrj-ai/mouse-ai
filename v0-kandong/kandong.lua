@@ -6,7 +6,22 @@
 -- 复用本机已装好的 Claude Code(claude -p),不需要 API key。
 
 local home       = os.getenv("HOME")
-local claudePath = home .. "/.local/bin/claude"
+-- 找 claude 可执行文件:先问 PATH(覆盖 npm / homebrew / 原生安装等各种位置),
+-- 再退回常见安装路径,最后退回 "claude"(靠下面 pathFix 兜底)。装到哪台机器都能找到——
+-- 不再写死 ~/.local/bin/claude(否则 npm 装的人路径不对,所有解释会静默失败)。
+local function detectClaude()
+  local pathPre = "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH:" .. home .. "/.local/bin; "
+  local f = io.popen(pathPre .. "command -v claude 2>/dev/null")
+  if f then
+    local p = (f:read("*l") or ""):gsub("%s+$", ""); f:close()
+    if p ~= "" then return p end
+  end
+  for _, p in ipairs({ home .. "/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude" }) do
+    local t = io.open(p, "r"); if t then t:close(); return p end
+  end
+  return "claude"
+end
+local claudePath = detectClaude()
 local selFile    = "/tmp/kandong_sel.txt"
 -- 卡点日志放通用位置(跟 key 同目录),不依赖项目路径——装到哪台机器都能记。
 local logDir     = home .. "/.config/kandong/logs"
@@ -407,7 +422,10 @@ local function runClaude(sel, mode)
     local em = errMark(trimmed) or (errtext and errMark(errtext))
     if #trimmed == 0 or em then
       local hint
+      local notFound = errtext and (errtext:match("command not found") or errtext:match("No such file")
+        or errtext:match("not found"))
       if em then hint = "cc 说没登录。请在终端运行 claude /login 重新登录后再试。"
+      elseif notFound then hint = "没找到 Claude Code。看懂要复用它才能解释。\n请先安装并登录:claude.com/claude-code\n(装好后重启终端,再点菜单栏锤子图标 Reload Config)"
       elseif errtext and #errtext > 0 then hint = "出错了:\n" .. errtext:sub(1, 300)
       else hint = "没拿到解释(可能超时)。再按一次试试。" end
       showCard("出错了", hint, "Esc 关闭", false)
