@@ -353,12 +353,92 @@ local function lookupLocal(sel)
   return nil
 end
 
+-- ===== 越用越懂你:个人画像 + 个人词典(全本地、不上传)=====
+-- 思路:看懂记住"你这个人"反复卡在哪、什么程度,讲解越来越贴你。云厂商做不到(要上传、千人一面),
+-- 这正是看懂的护城河。两块都纯本地、几乎零延迟,不破坏"内容不出本机"的承诺。
+local personalDictFile = cfgDir .. "/personal_dict.json"
+
+-- 个人词典:你卡过的"词/命令" → 你上次听懂的那条解释。下次同一个 0ms 秒出、还用你听懂的说法。
+local function loadPersonalDict()
+  local f = io.open(personalDictFile, "r"); if not f then return {} end
+  local raw = f:read("*a") or ""; f:close()
+  local ok, t = pcall(hs.json.decode, raw)
+  if ok and type(t) == "table" then return t end
+  return {}
+end
+local function dictKey(sel) return (sel:lower():gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")) end
+local function lookupPersonal(sel)
+  if not sel or #sel == 0 or #sel > 80 then return nil end       -- 只认"词/命令"这种短的
+  local e = loadPersonalDict()[dictKey(sel)]
+  if type(e) == "table" and type(e.a) == "string" and #e.a > 0 then return e.a end
+  return nil
+end
+local function savePersonal(sel, answer)
+  if not sel or #sel == 0 or #sel > 80 then return end
+  if not answer or #answer == 0 or #answer > 400 then return end
+  if answer:find("出错") or answer:find("没拿到") or answer:find("没找到 Claude") then return end
+  pcall(function()
+    local d = loadPersonalDict()
+    d[dictKey(sel)] = { a = answer, ts = os.date("!%Y-%m-%dT%H:%M:%SZ") }
+    local f = io.open(personalDictFile, "w"); if f then f:write(hs.json.encode(d)); f:close() end
+  end)
+end
+
+-- 个人画像:纯本地、纯计算(不调 AI、不加延迟)。数最近卡点的类别,拼一句塞进解释指令,
+-- 让 cc 按"你的程度"讲。数据越多越准;太少(<5 条)返回空,新用户行为同今天。
+local PROFILE_CATS = {
+  { name = "依赖安装",   kw = { "npm", "pnpm", "yarn", "pip", "install", "module", "node_modules", "依赖", "eresolve" } },
+  { name = "报错",       kw = { "error", "exception", "traceback", "failed", "fault", "报错", "enoent", "denied" } },
+  { name = "git",        kw = { "git", "commit", "push", "pull", "branch", "merge", "rebase", "分支", "仓库" } },
+  { name = "命令与权限", kw = { "sudo", "chmod", "rm ", "permission", "kill", "bash", "shell", "权限" } },
+  { name = "配置",       kw = { ".env", "config", "json", "yaml", "port", "端口", "环境变量", "配置" } },
+}
+local function personalProfile()
+  local prof = ""
+  pcall(function()
+    local f = io.open(logFile, "r"); if not f then return end
+    local lines = {}
+    for ln in f:lines() do lines[#lines + 1] = ln end
+    f:close()
+    local counts, total = {}, 0
+    for i = math.max(1, #lines - 119), #lines do
+      local ok, o = pcall(hs.json.decode, lines[i])
+      if ok and type(o) == "table" and o.preview then
+        total = total + 1
+        local p = o.preview:lower()
+        for _, c in ipairs(PROFILE_CATS) do
+          for _, k in ipairs(c.kw) do
+            if p:find(k, 1, true) then counts[c.name] = (counts[c.name] or 0) + 1; break end
+          end
+        end
+      end
+    end
+    if total < 5 then return end
+    local arr = {}
+    for name, n in pairs(counts) do arr[#arr + 1] = { name = name, n = n } end
+    table.sort(arr, function(a, b) return a.n > b.n end)
+    local top = {}
+    for i = 1, math.min(3, #arr) do if arr[i].n > 0 then top[#top + 1] = arr[i].name end end
+    if #top == 0 then return end
+    prof = "(读者是非技术用户,最近常卡在:" .. table.concat(top, "、")
+      .. "。请按这个熟悉度调整深浅,别重复他已熟的基础。)"
+  end)
+  return prof
+end
+
 local function runClaude(sel, mode)
   -- 本地秒答:quick 先查词典,命中就 0ms 显示、不打网络(仍记飞轮)
   if mode == "quick" then
     local hit = lookupLocal(sel)
     if hit then
       showCard("大白话", hit, "本地秒答 · ⌘⌥? 看详细 · Esc 关闭", false)
+      logQuery("quick", sel, true)
+      return
+    end
+    -- 个人词典:这个词你之前问过 → 用你上次听懂的说法,0ms 秒出
+    local phit = lookupPersonal(sel)
+    if phit then
+      showCard("大白话", phit, "你之前问过 · ⌘⌥? 看详细 · Esc 关闭", false)
       logQuery("quick", sel, true)
       return
     end
@@ -389,6 +469,12 @@ local function runClaude(sel, mode)
   else
     instr, loadTitle, doneTitle, doneFooter = QUICK_INSTR, "解释中…", "大白话", "⌘⌥? 看详细   ·   Esc 关闭"
     modelFlag = "--model haiku --no-session-persistence "  -- 快查用 haiku,更快更省
+  end
+  -- 越用越懂你:给选中解释(quick/deep)拼一句"个人画像",让 cc 按你的程度讲。
+  -- 纯本地计算、不加延迟;画像不含单引号,拼进单引号包裹的 shell 命令里安全。
+  if mode == "quick" or mode == "deep" then
+    local prof = personalProfile()
+    if #prof > 0 then instr = instr .. prof end
   end
   -- 提速:纯解释不需要技能/工具/chrome,关掉它们能少 ~2 秒、且避免偶尔加载 70+ 技能卡顿到 20s+
   -- haiku 那几种再加 --effort low(一句话解释不需要高强度思考,省思考时间和 token)
@@ -442,6 +528,7 @@ local function runClaude(sel, mode)
       showCard(doneTitle, trimmed, doneFooter, false)
     end
     logQuery(mode, sel, true)
+    if mode == "quick" then savePersonal(sel, trimmed) end   -- 存进个人词典,下次秒出
   end
 
   if streaming then
@@ -692,3 +779,6 @@ function kandongMd(s) return mdToHtml(s) end
 function kandongSmart() smart() end
 function kandongPending(t) return looksPending(t) and true or false end
 function kandongLocal(s) return lookupLocal(s) end
+function kandongProfile() return personalProfile() end
+function kandongPersonalGet(s) return lookupPersonal(s) end
+function kandongPersonalSave(s, a) savePersonal(s, a) end
