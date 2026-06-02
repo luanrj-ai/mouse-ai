@@ -384,8 +384,8 @@ local function savePersonal(sel, answer)
   end)
 end
 
--- 个人画像:纯本地、纯计算(不调 AI、不加延迟)。数最近卡点的类别,拼一句塞进解释指令,
--- 让 cc 按"你的程度"讲。数据越多越准;太少(<5 条)返回空,新用户行为同今天。
+-- 个人画像:纯本地、纯计算(不调 AI、不加延迟)。数最近卡点的「类别」+「技术栈」,
+-- 拼一句塞进解释指令,让 cc 按你的程度讲、用你熟的栈打比方。数据越多越准;<5 条返回空。
 local PROFILE_CATS = {
   { name = "依赖安装",   kw = { "npm", "pnpm", "yarn", "pip", "install", "module", "node_modules", "依赖", "eresolve" } },
   { name = "报错",       kw = { "error", "exception", "traceback", "failed", "fault", "报错", "enoent", "denied" } },
@@ -393,6 +393,34 @@ local PROFILE_CATS = {
   { name = "命令与权限", kw = { "sudo", "chmod", "rm ", "permission", "kill", "bash", "shell", "权限" } },
   { name = "配置",       kw = { ".env", "config", "json", "yaml", "port", "端口", "环境变量", "配置" } },
 }
+-- 技术栈:认出你平时写什么,解释时用你熟的语言/框架打比方。
+local STACK_CATS = {
+  { name = "React",            kw = { "react", "usestate", "useeffect", ".jsx", ".tsx", "next.js", "nextjs", "vite" } },
+  { name = "TypeScript",       kw = { "typescript", "tsc", ".ts", "tsconfig", "interface " } },
+  { name = "JavaScript/Node",  kw = { "npm", "node", "package.json", "npx", "yarn", "pnpm", ".js", "express" } },
+  { name = "Python",           kw = { "python", "pip", ".py", "traceback", "pytest", "venv", "conda", "django", "flask", "numpy", "pandas" } },
+  { name = "Rust",             kw = { "cargo", "rustc", ".rs", "rustup" } },
+  { name = "Go",               kw = { "go test", "go build", "go.mod", "golang", "go run" } },
+  { name = "Java/Kotlin",      kw = { "gradle", "maven", ".java", ".kt", "spring" } },
+  { name = "Ruby/Rails",       kw = { "gem ", "bundle", "rails", ".rb" } },
+  { name = "容器/运维",        kw = { "docker", "kubectl", "kubernetes", "terraform", "helm", "nginx" } },
+}
+-- 取出现次数最多的前 n 类(需 >= minN 次才算数,避免一两次的噪声)
+local function topNames(counts, n, minN)
+  local arr = {}
+  for name, c in pairs(counts) do if c >= (minN or 1) then arr[#arr + 1] = { name = name, n = c } end end
+  table.sort(arr, function(a, b) return a.n > b.n end)
+  local out = {}
+  for i = 1, math.min(n, #arr) do out[#out + 1] = arr[i].name end
+  return out
+end
+local function countHits(p, cats, counts)
+  for _, c in ipairs(cats) do
+    for _, k in ipairs(c.kw) do
+      if p:find(k, 1, true) then counts[c.name] = (counts[c.name] or 0) + 1; break end
+    end
+  end
+end
 local function personalProfile()
   local prof = ""
   pcall(function()
@@ -400,28 +428,24 @@ local function personalProfile()
     local lines = {}
     for ln in f:lines() do lines[#lines + 1] = ln end
     f:close()
-    local counts, total = {}, 0
+    local cat, stack, total = {}, {}, 0
     for i = math.max(1, #lines - 119), #lines do
       local ok, o = pcall(hs.json.decode, lines[i])
       if ok and type(o) == "table" and o.preview then
         total = total + 1
         local p = o.preview:lower()
-        for _, c in ipairs(PROFILE_CATS) do
-          for _, k in ipairs(c.kw) do
-            if p:find(k, 1, true) then counts[c.name] = (counts[c.name] or 0) + 1; break end
-          end
-        end
+        countHits(p, PROFILE_CATS, cat)
+        countHits(p, STACK_CATS, stack)
       end
     end
     if total < 5 then return end
-    local arr = {}
-    for name, n in pairs(counts) do arr[#arr + 1] = { name = name, n = n } end
-    table.sort(arr, function(a, b) return a.n > b.n end)
-    local top = {}
-    for i = 1, math.min(3, #arr) do if arr[i].n > 0 then top[#top + 1] = arr[i].name end end
-    if #top == 0 then return end
-    prof = "(读者是非技术用户,最近常卡在:" .. table.concat(top, "、")
-      .. "。请按这个熟悉度调整深浅,别重复他已熟的基础。)"
+    local topics = topNames(cat, 3, 1)
+    local stacks = topNames(stack, 2, 3)        -- 技术栈需 >=3 次才算,更稳
+    if #topics == 0 and #stacks == 0 then return end
+    prof = "(读者是非技术用户"
+    if #topics > 0 then prof = prof .. ",最近常卡在:" .. table.concat(topics, "、") end
+    if #stacks > 0 then prof = prof .. ";平时主要写:" .. table.concat(stacks, "、") end
+    prof = prof .. "。请按这个熟悉度调整深浅、别重复他已熟的基础;打比方时尽量用他熟的语言/框架。)"
   end)
   return prof
 end
