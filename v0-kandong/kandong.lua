@@ -29,10 +29,13 @@ local logFile    = logDir .. "/confusions.jsonl"
 os.execute('mkdir -p "' .. logDir .. '"')
 local MAX_CHARS  = 6000
 
--- ===== 匿名使用心跳(只为算"留存":装了之后还有没有人在持续用)=====
--- 发出去的只有:一串随机匿名码 + 事件名(installed/used) + 日期 + 版本/系统。
--- 绝不发任何选中内容、屏幕文字、文件名、路径。
--- 默认开;想关 = 建个空文件即可,即时生效、不用重载:
+-- ===== 匿名使用心跳 + 效果信号(算"留存"和"解释好不好用")=====
+-- 发出去的只有:随机匿名码 + 事件名 + 日期/版本/系统,外加几个结果信号和粗粒度元数据:
+--   installed/used  —— 留存。
+--   explained       —— 每次解释:mode、source(本地词典/个人词典/中转/claude)、ok、sel_len/ans_len(分桶长度,不是原文)。
+--   feedback        —— 用户点右下角"没懂?"时:helpful(恒为 false)、mode。(懂了=直接关掉,不发)
+-- 绝不发任何选中内容、屏幕文字、答案正文、文件名、路径。长度只发分桶(如 "21-80"),不发原文。
+-- 默认开;想关 = 建个空文件即可,即时生效、不用重载(一关全关):
 --     touch ~/.config/kandong/telemetry.off
 -- 安全兜底:POSTHOG_KEY 为空时整段是 no-op(什么都不发),所以提交进仓库也安全。
 local POSTHOG_KEY  = "phc_BSyxvEdp6arPfeKC73gKzqajb7D79LqUmSWVJVPoQZ5F"  -- 公开写入 key,可提交
@@ -60,11 +63,27 @@ local function anonId()
   return id, true
 end
 
-local function teleSend(event)
+-- 长度分桶:埋点里只发"大概多长"这种粗粒度,绝不发原文。长度是元数据、不是内容。
+local function lenBucket(n)
+  n = n or 0
+  if n <= 20 then return "0-20"
+  elseif n <= 80 then return "21-80"
+  elseif n <= 400 then return "81-400"
+  else return "400+" end
+end
+
+-- extraProps:可带不含内容的结构化属性(mode/source/ok/分桶长度/👍👎),绝不放选中内容/屏幕文字/路径。
+-- 开关守卫集中在这里:telemetry 关了 / 没填 key,任何事件都不发(installed/used/explained/feedback 一视同仁)。
+local function teleSend(event, extraProps)
+  if not teleEnabled() then return end
   local id = anonId()
+  local props = { ["$lib"] = "kandong", version = "v0", os = "macos" }
+  if type(extraProps) == "table" then
+    for k, v in pairs(extraProps) do props[k] = v end
+  end
   local body = hs.json.encode({
     api_key = POSTHOG_KEY, event = event, distinct_id = id,
-    properties = { ["$lib"] = "kandong", version = "v0", os = "macos" },
+    properties = props,
     timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
   })
   hs.http.asyncPost(POSTHOG_HOST .. "/capture/", body,
@@ -84,6 +103,61 @@ local function heartbeat()
       local w = io.open(teleStateF, "w"); if w then w:write(today); w:close() end
       teleSend("used")
     end
+  end)
+end
+
+-- ===== 自动更新(下载+提醒,手动 Reload)=====
+-- 每天首次启动后台拉一下 GitHub 最新版;有新版→校验→备份旧版→替换→弹提示让用户 Reload。
+-- 两个安全点:
+--   1) 只更新"标准安装路径"的副本(~/.hammerspoon/mouse-ai/kandong.lua)。从别处加载(如开发机
+--      直接 dofile 仓库文件)时整段 no-op,绝不覆盖开发副本。
+--   2) 替换前校验(非空、够长、含已知标志),坏下载绝不顶上去;旧版先备份成 .bak。
+local KANDONG_BUILD  = 1   -- 每次发版 +1;远端 build 比这个大才更新
+local UPDATE_RAW_URL = "https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/v0-kandong/kandong.lua"
+local installPath    = home .. "/.hammerspoon/mouse-ai/kandong.lua"
+local updateStateF   = cfgDir .. "/update_check"   -- 记最近一次检查日期(每天最多查一次)
+
+local function loadedFromInstallPath()
+  -- 当前文件实际路径(@/path/...);只有 == 标准安装路径才允许自更新
+  local src = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+  return src == installPath
+end
+
+local function autoUpdate()
+  pcall(function()
+    if not loadedFromInstallPath() then return end   -- 开发副本/非标准路径:整段 no-op
+    -- 每天最多查一次
+    local today = os.date("!%Y-%m-%d")
+    local last = ""
+    local f = io.open(updateStateF, "r"); if f then last = (f:read("*a") or ""):gsub("%s", ""); f:close() end
+    if last == today then return end
+    local w = io.open(updateStateF, "w"); if w then w:write(today); w:close() end
+
+    hs.http.asyncGet(UPDATE_RAW_URL, nil, function(status, body)
+      if status ~= 200 or type(body) ~= "string" then return end
+      -- 校验:够长 + 含已知标志(防半截下载/错误页/被劫持的内容顶上去)
+      if #body < 5000 then return end
+      if not (body:find("看懂已就绪", 1, true) and body:find("hs.hotkey.bind", 1, true)
+              and body:find("KANDONG_BUILD", 1, true)) then return end
+      -- 远端 build 比本地大才更新
+      local rb = tonumber(body:match("KANDONG_BUILD%s*=%s*(%d+)") or "")
+      if not rb or rb <= KANDONG_BUILD then return end
+      -- 先备份旧版,再写新版
+      pcall(function()
+        local cur = io.open(installPath, "r")
+        if cur then
+          local data = cur:read("*a"); cur:close()
+          local bk = io.open(installPath .. ".bak", "w"); if bk then bk:write(data or ""); bk:close() end
+        end
+      end)
+      local nf = io.open(installPath, "w"); if not nf then return end
+      nf:write(body); nf:close()
+      pcall(function()
+        hs.notify.new({ title = "看懂已更新到 build " .. rb,
+          informativeText = "点菜单栏锤子图标 → Reload Config 生效" }):send()
+      end)
+      hs.alert.show("看懂有新版(build " .. rb .. "),点锤子图标 → Reload Config 生效")
+    end)
   end)
 end
 
@@ -121,6 +195,18 @@ local SCREEN_INSTR = "下面是终端最近画面(Claude Code 与用户的对话
 
 -- ===== 状态 =====
 local popup, escKey, hideTimer
+
+-- ===== 反馈桥:浮窗右下角"没懂?"通过它回传给 Lua =====
+-- 设计:只有"没懂"才需要按钮。看懂了直接 Esc 关掉=默认的"懂了",不必点、也不发信号。
+-- 对外:只发一个"没懂"结果信号 + 模式给作者(匿名,绝不含选中内容/答案)。
+-- 对内(本地闭环,越用越懂你):删掉烂答案 + 记住"这类要讲细" + 立刻换聪明模型重讲。
+-- fbSel 是当前卡片对应的选中内容,只在本机内存里用,绝不外发。
+local fbMode, fbSel = nil, nil
+local handleFeedback   -- 前向声明:真正实现放在 runClaude / 个人词典函数之后(见下方),这样能调用它们
+local fbController = hs.webview.usercontent.new("kandong")
+fbController:setCallback(function(msg)
+  if (msg and msg.body == "down") and handleFeedback then handleFeedback() end
+end)
 
 -- ===== 工具 =====
 local function jsonStr(s)
@@ -172,7 +258,7 @@ local function mdToHtml(s)
   return table.concat(out, "")
 end
 
-local function cardHTML(title, body, footer, loading)
+local function cardHTML(title, body, footer, loading, feedback)
   local inner
   if loading then
     inner = '<div class="loading"><span class="dot"></span>' .. htmlEsc(body) .. '</div>'
@@ -181,6 +267,13 @@ local function cardHTML(title, body, footer, loading)
   end
   -- body 容器固定 id="out",标题/脚注也带 id,方便流式时用 JS 原地更新(不重建浮窗)
   local bodyHtml = '<div class="body" id="out">' .. inner .. '</div>'
+  -- 反馈:只放一个右下角的"没懂?"。看懂了直接 Esc 关掉就是默认的"懂了",不必点。
+  -- 点"没懂?"→ 删烂答案 + 记这类要讲细 + 立刻换聪明模型重讲(并匿名告诉作者,不含内容)。
+  local footerInner = htmlEsc(footer)
+  if feedback then
+    footerInner = '<span>' .. footerInner .. '</span>'
+      .. '<a class="fblink" id="fbwrap" onclick="fb()">没懂?</a>'
+  end
   return [[<!doctype html><html><head><meta charset="utf-8"><style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html,body { background:transparent; }
@@ -205,12 +298,24 @@ local function cardHTML(title, body, footer, loading)
       margin-right:10px; animation:pulse 1s infinite; }
     @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
     .footer { font-size:11px; color:#8e8e93; margin-top:12px;
-      padding-top:10px; border-top:0.5px solid #ffffff1a; }
+      padding-top:10px; border-top:0.5px solid #ffffff1a;
+      display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .fblink { color:#8e8e93; cursor:pointer; text-decoration:none; white-space:nowrap; }
+    .fblink:hover { color:#0a84ff; }
+    .fbdone { color:#8e8e93; white-space:nowrap; }
   </style></head><body><div class="card">
     <div class="title" id="ttl">]] .. htmlEsc(title) .. [[</div>
     ]] .. bodyHtml .. [[
-    <div class="footer" id="ftr">]] .. htmlEsc(footer) .. [[</div>
-  </div></body></html>]]
+    <div class="footer" id="ftr">]] .. footerInner .. [[</div>
+  </div>
+  <script>
+    function fb(){
+      try{ window.webkit.messageHandlers.kandong.postMessage('down'); }catch(e){}
+      var w=document.getElementById('fbwrap');
+      if(w){ w.outerHTML='<span class="fbdone">重讲中…</span>'; }
+    }
+  </script>
+  </body></html>]]
 end
 
 local function closePopup()
@@ -219,7 +324,7 @@ local function closePopup()
   if hideTimer then hideTimer:stop(); hideTimer = nil end
 end
 
-local function showCard(title, body, footer, loading)
+local function showCard(title, body, footer, loading, feedback)
   local pos = hs.mouse.absolutePosition()
   local scr = hs.mouse.getCurrentScreen():fullFrame()
   local w, h = 480, 280
@@ -231,12 +336,13 @@ local function showCard(title, body, footer, loading)
   if y < scr.y then y = scr.y + 14 end
 
   if popup then popup:delete() end
-  popup = hs.webview.new({ x = x, y = y, w = w, h = h })
+  -- 带上 fbController:浮窗里的 👍/👎 才能 postMessage 回 Lua
+  popup = hs.webview.new({ x = x, y = y, w = w, h = h }, {}, fbController)
   popup:windowStyle({ "borderless", "nonactivating" })  -- 不抢焦点,终端仍能按 1/2/3
   popup:level(hs.drawing.windowLevels.floating)
   popup:shadow(true)
   popup:transparent(true)
-  popup:html(cardHTML(title, body, footer, loading))
+  popup:html(cardHTML(title, body, footer, loading, feedback))
   popup:bringToFront(true)
   popup:show()
 
@@ -383,6 +489,16 @@ local function savePersonal(sel, answer)
     local f = io.open(personalDictFile, "w"); if f then f:write(hs.json.encode(d)); f:close() end
   end)
 end
+-- "没懂":把这条听不懂的解释从个人词典删掉,下次别再把烂答案 0ms 秒出
+local function removePersonal(sel)
+  if not sel or #sel == 0 or #sel > 80 then return end
+  pcall(function()
+    local d = loadPersonalDict()
+    if d[dictKey(sel)] == nil then return end
+    d[dictKey(sel)] = nil
+    local f = io.open(personalDictFile, "w"); if f then f:write(hs.json.encode(d)); f:close() end
+  end)
+end
 
 -- 个人画像:纯本地、纯计算(不调 AI、不加延迟)。数最近卡点的「类别」+「技术栈」,
 -- 拼一句塞进解释指令,让 cc 按你的程度讲、用你熟的栈打比方。数据越多越准;<5 条返回空。
@@ -421,6 +537,33 @@ local function countHits(p, cats, counts)
     end
   end
 end
+
+-- 👎 反馈飞轮:记住"哪类解释你常说没懂",以后同类自动讲更细。纯本地、不上传。
+local needsDeeperFile = cfgDir .. "/needs_deeper.json"
+local function categoryOf(sel)
+  local p = (sel or ""):lower()
+  for _, c in ipairs(PROFILE_CATS) do
+    for _, k in ipairs(c.kw) do
+      if p:find(k, 1, true) then return c.name end
+    end
+  end
+  return nil
+end
+local function loadNeedsDeeper()
+  local f = io.open(needsDeeperFile, "r"); if not f then return {} end
+  local raw = f:read("*a") or ""; f:close()
+  local ok, t = pcall(hs.json.decode, raw)
+  if ok and type(t) == "table" then return t end
+  return {}
+end
+local function bumpNeedsDeeper(sel)
+  local cat = categoryOf(sel); if not cat then return end
+  pcall(function()
+    local d = loadNeedsDeeper()
+    d[cat] = (tonumber(d[cat]) or 0) + 1
+    local f = io.open(needsDeeperFile, "w"); if f then f:write(hs.json.encode(d)); f:close() end
+  end)
+end
 local function personalProfile()
   local prof = ""
   pcall(function()
@@ -447,6 +590,14 @@ local function personalProfile()
     if #stacks > 0 then prof = prof .. ";平时主要写:" .. table.concat(stacks, "、") end
     prof = prof .. "。请按这个熟悉度调整深浅、别重复他已熟的基础;打比方时尽量用他熟的语言/框架。)"
   end)
+  -- 叠加 👎 飞轮:对常说"没懂"的类别要求讲更细(独立生效,即便上面画像为空)
+  pcall(function()
+    local nd, deep = loadNeedsDeeper(), {}
+    for cat, c in pairs(nd) do if (tonumber(c) or 0) >= 2 then deep[#deep + 1] = cat end end
+    if #deep > 0 then
+      prof = prof .. "(他对【" .. table.concat(deep, "、") .. "】类常反馈没懂,这类请讲得更细、更基础、多打比方。)"
+    end
+  end)
   return prof
 end
 
@@ -455,15 +606,21 @@ local function runClaude(sel, mode)
   if mode == "quick" then
     local hit = lookupLocal(sel)
     if hit then
-      showCard("大白话", hit, "本地秒答 · ⌘⌥? 看详细 · Esc 关闭", false)
+      fbMode, fbSel = "quick", sel
+      showCard("大白话", hit, "本地秒答 · ⌘⌥? 看详细 · Esc 关闭", false, true)
       logQuery("quick", sel, true)
+      teleSend("explained", { mode = "quick", source = "local_dict", ok = true,
+        sel_len = lenBucket(#sel), ans_len = lenBucket(#hit) })
       return
     end
     -- 个人词典:这个词你之前问过 → 用你上次听懂的说法,0ms 秒出
     local phit = lookupPersonal(sel)
     if phit then
-      showCard("大白话", phit, "你之前问过 · ⌘⌥? 看详细 · Esc 关闭", false)
+      fbMode, fbSel = "quick", sel
+      showCard("大白话", phit, "你之前问过 · ⌘⌥? 看详细 · Esc 关闭", false, true)
       logQuery("quick", sel, true)
+      teleSend("explained", { mode = "quick", source = "personal_dict", ok = true,
+        sel_len = lenBucket(#sel), ans_len = lenBucket(#phit) })
       return
     end
   end
@@ -521,6 +678,7 @@ local function runClaude(sel, mode)
   end
 
   local task, killer, done = nil, nil, false
+  local usedSource = "claude"   -- 实际出答案的后端:claude / relay(中转);埋点用,不含内容
 
   -- 收尾:出错显示提示,成功则定稿(流式时同一浮窗 JS 更新,不重建)
   local function finish(text, errtext, streamedAlready)
@@ -540,6 +698,8 @@ local function runClaude(sel, mode)
       else hint = "没拿到解释(可能超时)。再按一次试试。" end
       showCard("出错了", hint, "Esc 关闭", false)
       logQuery(mode, sel, false)
+      teleSend("explained", { mode = mode, source = usedSource, ok = false,
+        sel_len = lenBucket(#sel), ans_len = "0-20" })
       return
     end
     if streamedAlready and popup then
@@ -549,9 +709,12 @@ local function runClaude(sel, mode)
         .. "var fr=document.getElementById('ftr'); if(fr)fr.innerHTML=" .. jsonStr(htmlEsc(doneFooter)) .. ";"
       pcall(function() popup:evaluateJavaScript(js) end)
     else
-      showCard(doneTitle, trimmed, doneFooter, false)
+      fbMode, fbSel = mode, sel
+      showCard(doneTitle, trimmed, doneFooter, false, true)
     end
     logQuery(mode, sel, true)
+    teleSend("explained", { mode = mode, source = usedSource, ok = true,
+      sel_len = lenBucket(#sel), ans_len = lenBucket(#trimmed) })
     if mode == "quick" then savePersonal(sel, trimmed) end   -- 存进个人词典,下次秒出
   end
 
@@ -624,6 +787,7 @@ local function runClaude(sel, mode)
           and o.choices[1].message then content = o.choices[1].message.content end
         content = cleanRelay(content)   -- 去掉 <think> 推理块再判断/显示
         if content and #(content:gsub("%s", "")) > 0 then
+          usedSource = "relay"
           finish(content, nil, false)
         else
           -- 中转没给正文(key/网络/参数问题)→ 兜底回本机 claude,先把原文写回 myFile
@@ -651,10 +815,40 @@ local function runClaude(sel, mode)
     os.remove(myFile)
     showCard("太久没回", "cc 这次太久没响应(可能卡住或网络慢)。按 Esc 关掉,再按一次试试。", "Esc 关闭", false)
     logQuery(mode, sel, false)
+    teleSend("explained", { mode = mode, source = usedSource, ok = false,
+      sel_len = lenBucket(#sel), ans_len = "0-20", timeout = true })
   end)
 end
 
+-- ===== "没懂"本地闭环实现(前向声明在文件上方;放这里才能调到 runClaude / 个人词典)=====
+-- 只有用户点右下角"没懂?"才触发(懂了=直接关掉=默认,不点也不发信号)。三件事一起做:
+--   ① 删掉这条烂答案(下次别再 0ms 秒出) ② 记住"这类要讲更细" ③ 立刻换聪明模型(deep)重讲。
+-- 全程纯本地:删词典、记类别都只写本机文件;只有"没懂"这一个结果信号匿名发给作者(不含内容)。
+function handleFeedback()
+  local sel, mode = fbSel, fbMode
+  teleSend("feedback", { helpful = false, mode = mode or "" })   -- 对外:匿名,一关全关同 telemetry.off
+  if not (sel and #sel > 0) then return end
+  removePersonal(sel)      -- ① 别再把这条烂答案 0ms 秒出
+  bumpNeedsDeeper(sel)     -- ② 记住这类要讲更细(下次同类 personalProfile 会要求讲深点)
+  runClaude(sel, "deep")   -- ③ 立刻换更聪明的模型重讲一遍
+end
+
+-- 终端开了「安全键盘输入」(Secure Keyboard Entry)时,系统会拦掉一切模拟按键,
+-- 包括我们模拟的 ⌘C → 复制不到选区。AX 读屏不受影响,所以现象是「全屏能用、划选失效」。
+local function secureInputOn()
+  local f = hs.eventtap.isSecureInputEnabled
+  return type(f) == "function" and f() or false
+end
+
+-- 划选抓不到、且安全键盘输入开着时的提示卡:告诉用户去关掉它,而不是默默退化成读整屏。
+local function secureInputCard()
+  showCard("划选用不了 · 终端开了「安全键盘输入」",
+    "这个开关会拦掉划选复制(整屏解释不受影响)。到菜单栏关掉它再划选:iTerm2 → 取消勾选 Secure Keyboard Entry;系统「终端」→ 取消勾选 安全键盘输入。",
+    "Esc 关闭", false)
+end
+
 -- 抓当前选中文字:先存剪贴板 → 模拟 ⌘C → 读 → 还原(全异步,不卡界面)
+-- 抓不到时把 secure(是否开了安全键盘输入)回传给上层,据此提示而非默默读整屏。
 local function withSelection(fn)
   local saved = hs.pasteboard.getContents()
   hs.pasteboard.clearContents()
@@ -664,14 +858,15 @@ local function withSelection(fn)
     hs.timer.doAfter(0.1, function()
       if saved ~= nil then hs.pasteboard.setContents(saved) end
     end)
-    if sel == nil or sel == "" then fn(nil) else fn(sel) end
+    if sel == nil or sel == "" then fn(nil, secureInputOn()) else fn(sel) end
   end)
 end
 
 local function explain(mode)
-  withSelection(function(sel)
+  withSelection(function(sel, secure)
     if not sel then
-      showCard("没选中文字", "先用鼠标在终端里划选一段看不懂的内容,再按快捷键。", "Esc 关闭", false)
+      if secure then secureInputCard()
+      else showCard("没选中文字", "先用鼠标在终端里划选一段看不懂的内容,再按快捷键。", "Esc 关闭", false) end
       return
     end
     runClaude(sel, mode)
@@ -710,11 +905,12 @@ end
 -- ⌘?:智能键。选中了 → 解释那段;没选中 → 读最近屏幕,有权限请求就解释+风险,否则总结。
 local function smart()
   heartbeat()
-  withSelection(function(sel)
+  withSelection(function(sel, secure)
     if sel and #sel > 0 then
       runClaude(sel, "quick")
       return
     end
+    if secure then secureInputCard(); return end
     local text = readScreenText()
     if not text or #text < 20 then
       showCard("没读到内容", "选一段文字按 ⌘? 我来解释;或在终端里按,我读最近的内容帮你看。", "Esc 关闭", false)
@@ -732,11 +928,12 @@ end
 -- ⌘⌥?:详细版智能键。选中了→详细解释那段;没选中→读屏,稍详细解释整屏在干嘛。
 local function smartDeep()
   heartbeat()
-  withSelection(function(sel)
+  withSelection(function(sel, secure)
     if sel and #sel > 0 then
       runClaude(sel, "deep")
       return
     end
+    if secure then secureInputCard(); return end
     local text = readScreenText()
     if not text or #text < 20 then
       showCard("没读到内容", "在终端里按 ⌘⌥? 我会读最近这一屏帮你详细讲;选中一段则详细解释那段。", "Esc 关闭", false)
@@ -795,6 +992,9 @@ SummaryTap:start()
 hs.hotkey.bind({ "cmd" }, "/", summarize)                              -- ⌘/  (兜底,稳)
 
 hs.alert.show("看懂已就绪  ·  ⌥? 解释/看屏  ·  ⌘⌥? 详细  ·  ⌘? 卡点小结")
+
+-- 启动后台查一次更新(每天最多一次;非标准安装路径自动跳过,不影响开发副本)
+autoUpdate()
 
 -- 测试钩子:可用 hs CLI 触发,验证"浮窗+调 cc"链路,无需辅助功能/无需选中
 function kandongExplainText(txt, mode) runClaude(txt, mode or "quick") end
