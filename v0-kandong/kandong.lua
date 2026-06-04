@@ -112,7 +112,7 @@ end
 --   1) 只更新"标准安装路径"的副本(~/.hammerspoon/mouse-ai/kandong.lua)。从别处加载(如开发机
 --      直接 dofile 仓库文件)时整段 no-op,绝不覆盖开发副本。
 --   2) 替换前校验(非空、够长、含已知标志),坏下载绝不顶上去;旧版先备份成 .bak。
-local KANDONG_BUILD  = 1   -- 每次发版 +1;远端 build 比这个大才更新
+local KANDONG_BUILD  = 2   -- 每次发版 +1;远端 build 比这个大才更新
 local UPDATE_RAW_URL = "https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/v0-kandong/kandong.lua"
 local installPath    = home .. "/.hammerspoon/mouse-ai/kandong.lua"
 local updateStateF   = cfgDir .. "/update_check"   -- 记最近一次检查日期(每天最多查一次)
