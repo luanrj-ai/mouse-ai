@@ -64,8 +64,9 @@
     letter-spacing:.04em; text-transform:uppercase; color:var(--ink-2);
     padding:6px 12px; border:1px solid var(--line-2); border-radius:99px; background:#ffffff70}
   .eyebrow .dot{width:6px; height:6px; border-radius:99px; background:var(--safe)}
-  h1.headline{font-size:clamp(38px,5.2vw,64px); line-height:1.06; letter-spacing:-.025em;
+  h1.headline{font-size:clamp(32px,4.6vw,54px); line-height:1.12; letter-spacing:-.025em;
     font-weight:600; margin:22px 0 24px; text-wrap:balance}
+  h1.headline .nb{white-space:nowrap}
   h1.headline .hl{background:linear-gradient(transparent 55%, var(--accent) 55%); padding:0 4px}
   h1.headline .strike{text-decoration:line-through; text-decoration-color:var(--danger);
     text-decoration-thickness:3px; color:var(--ink-3)}
@@ -444,7 +445,7 @@ const I18N = {
   cn: {
     nav_why:"为什么", nav_how:"怎么用", nav_compare:"对比", nav_thesis:"缘起", nav_safety:"安全", nav_cta:"立即安装 →",
     hero_eyebrow:"v0 · 看懂 · 给 Mac + 已在用 Claude Code 的人",
-    hero_h1:'在终端里<span class="hl">指哪解释哪</span>。<br>不用切窗口、<br><span class="strike">不用稀里糊涂点继续</span>。',
+    hero_h1:'<span class="nb">在终端里<span class="hl">指哪解释哪</span>。</span><br><span class="nb">不用切窗口、</span><br><span class="nb"><span class="strike">不用稀里糊涂点继续</span>。</span>',
     hero_sub:'给不懂技术的人用。在 Claude Code 里划选看不懂的东西、按下快捷键,<b>几秒内大白话讲清</b>;cc 要动手时,告诉你它要干嘛、有没有风险、该不该放行。<b>它还有记忆——记住你常卡的地方,帮你总结学到了什么。</b>',
     hero_cta1:"让 cc 帮你装 →", hero_cta2:"先看看怎么用",
     hero_meta:'复用本机 <span class="kbd-inline">Claude Code</span> · 零 API key · 内容不经我们手',
