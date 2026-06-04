@@ -6,7 +6,7 @@
 <title>mouseAI · 指哪解释哪的鼠标 Agent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f4efe4; --bg-2:#ebe5d6; --ink:#14110d; --ink-2:#423d33; --ink-3:#7a7264;
@@ -18,7 +18,7 @@
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
   html,body{background:var(--bg); color:var(--ink);
-    font-family:"Geist","Noto Sans SC",-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    font-family:"Geist","PingFang SC",-apple-system,"Helvetica Neue",sans-serif;
     -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;}
   body{background:
       radial-gradient(900px 600px at 85% -10%, #fbd02e22 0%, transparent 60%),
@@ -182,6 +182,24 @@
   .comp .mark{font-family:"JetBrains Mono"; font-size:16px}
   .comp .mark.yes{color:var(--safe)}.comp .mark.no{color:var(--ink-3); opacity:.5}.comp .mark.partial{color:#c9931a}
 
+  /* thesis: 缘起 / 预期 / 分析 */
+  #thesis .section-head h2{white-space:nowrap}
+  .thesis-grid{display:flex; flex-direction:column; gap:18px}
+  .thesis-block{background:#fff; border:1px solid var(--line-2); border-radius:16px; padding:30px 34px;
+    display:grid; grid-template-columns:200px 1fr; gap:36px; align-items:start;
+    border-left:3px solid var(--accent); transition:transform .2s ease, box-shadow .2s ease}
+  .thesis-block:hover{transform:translateY(-2px); box-shadow:0 14px 30px -14px rgba(20,17,13,.12)}
+  .thesis-side .tnum{font-family:"JetBrains Mono"; font-size:13px; color:var(--ink-3); letter-spacing:.04em}
+  .thesis-side .tkick{font-size:21px; font-weight:600; letter-spacing:-.01em; margin-top:10px; line-height:1.25}
+  .thesis-main h3{font-size:20px; font-weight:600; line-height:1.4; margin-bottom:12px; letter-spacing:-.01em}
+  .thesis-main p{font-size:15px; line-height:1.7; color:var(--ink-2)}
+  .thesis-main p b{color:var(--ink)}
+  .thesis-main ul{margin-top:16px; display:flex; flex-direction:column; gap:10px; list-style:none}
+  .thesis-main li{font-size:14px; line-height:1.62; color:var(--ink-2); padding-left:20px; position:relative}
+  .thesis-main li::before{content:""; position:absolute; left:2px; top:9px; width:6px; height:6px;
+    border-radius:99px; background:var(--accent)}
+  .thesis-main li b{color:var(--ink)}
+
   /* install */
   .install-grid{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:28px}
   .step{background:#fff; border:1px solid var(--line-2); border-radius:14px; padding:24px 20px; position:relative}
@@ -243,6 +261,8 @@
   @media(max-width:960px){
     .hero-grid{grid-template-columns:1fr}
     .anti-grid,.hotkey-grid,.faq-grid{grid-template-columns:1fr}
+    .thesis-block{grid-template-columns:1fr; gap:14px}
+    #thesis .section-head h2{white-space:normal}
     .install-grid{grid-template-columns:1fr 1fr}
     .answer-card{grid-template-columns:auto 1fr}
     .privacy-banner .stat{margin-left:0}
@@ -265,6 +285,7 @@
       <a href="#why" data-i18n="nav_why"></a>
       <a href="#how" data-i18n="nav_how"></a>
       <a href="#compare" data-i18n="nav_compare"></a>
+      <a href="#thesis" data-i18n="nav_thesis"></a>
       <a href="#safety" data-i18n="nav_safety"></a>
       <button class="lang" id="langToggle"></button>
       <a class="btn" href="#install" data-i18n="nav_cta"></a>
@@ -335,6 +356,16 @@
   <table class="comp" id="compTable"></table>
 </div></section>
 
+<!-- THESIS · 缘起 / 预期 / 分析 -->
+<section class="section" id="thesis"><div class="wrap">
+  <div class="section-head">
+    <div class="label" data-i18n="th_label"></div>
+    <h2 data-i18n="th_h2"></h2>
+    <p data-i18n="th_p"></p>
+  </div>
+  <div class="thesis-grid" id="thesisGrid"></div>
+</div></section>
+
 <!-- INSTALL -->
 <section class="section" id="install" style="background:#ffffff80"><div class="wrap">
   <div class="section-head">
@@ -392,7 +423,7 @@
 <script>
 const I18N = {
   cn: {
-    nav_why:"为什么", nav_how:"怎么用", nav_compare:"对比", nav_safety:"安全", nav_cta:"立即安装 →",
+    nav_why:"为什么", nav_how:"怎么用", nav_compare:"对比", nav_thesis:"缘起", nav_safety:"安全", nav_cta:"立即安装 →",
     hero_eyebrow:"v0 · 看懂 · 给 Mac + 已在用 Claude Code 的人",
     hero_h1:'在终端里<span class="hl">指哪解释哪</span>。<br>不用切窗口、<br><span class="strike">不用稀里糊涂点继续</span>。',
     hero_sub:'给不懂技术的人用。在 Claude Code 里划选看不懂的东西、按下快捷键,<b>几秒内大白话讲清</b>;cc 要动手时,告诉你它要干嘛、有没有风险、该不该放行。<b>它还有记忆——记住你常卡的地方,帮你总结学到了什么。</b>',
@@ -416,6 +447,26 @@ const I18N = {
     cmp_label:"和其他东西不一样在哪",
     cmp_h2:"我们不和别人抢同一个用户。",
     cmp_p:'市面上的 AI 工具都假设你"想做什么",我们假设你"已经在做什么,但需要看懂"。',
+    th_label:"缘起 · 预期 · 分析",
+    th_h2:'我们为什么做、<span class="mk">赌什么</span>、怎么看这件事。',
+    th_p:"不藏在投资人 deck 里——做这个产品背后的判断,直接摆给你看,每条你都能自己验证。",
+    thesis:[
+      {n:"01", k:"为什么要做这个",
+       h:"工具一夜变强,人没跟上。",
+       body:'Claude Code 把"会编程"的门槛拉到了几乎为零——但没把"看懂自己在干什么"的门槛拉低。非技术的人现在能让 cc 写出能跑的东西,却常常卡在一屏报错、一个英文术语、一句 <b>Do you want to proceed</b> 前面,只能凭感觉点继续。缺的不是更强的模型,是一层<b>看得见、拦得住、解释得清</b>的人机接口。我们补这一层。'},
+      {n:"02", k:"预期",
+       h:'不赌"更多人想编程",赌"已经在用的人想看懂"。',
+       body:'我们不打算说服新人来学编程——那是教程和 Copilot 的战场。我们赌一个更窄、更真的需求:<b>已经在用 cc、但每天都在"稀里糊涂点继续"的非技术用户</b>。路径是先做最小切口(终端里指哪解释哪),再靠<b>"越用越懂你"的本地个性化</b>留住人。成功的样子不是 DAU 暴涨,是<b>有人舍不得卸</b>——因为它记住了你常卡的地方。'},
+      {n:"03", k:"分析",
+       h:"为什么是现在、为什么是这个切口。",
+       body:"把判断拆成四条,每条你都能自己验证:",
+       points:[
+         '<b>时机:</b>cc 这类 agent 刚把大批非技术用户卷进来,他们的"看不懂"是全新、还没人正经接的痛点。',
+         '<b>切口:</b>不碰"帮你做"(红海),只做"帮你看懂"(几乎没人做)。复杂度加在<b>"更准"</b>,不加在"更久"。',
+         '<b>护城河:</b>走本地个性化——你的词典、卡点、画像都在你机器上,越用越懂你,别人拿不走;不是靠垂直行业壁垒。',
+         '<b>风险:</b>依赖本机 cc(平台风险)、辅助功能权限的信任门槛。我们用<b>全开源 + 内容不外发 + 一键卸载</b>来对冲。',
+       ]},
+    ],
     ins_label:"安装 · macOS",
     ins_h2:"一句话,交给 cc 装好。",
     ins_p:"需要本机已经装好并登录过 Claude Code(任意 plan)。v0 目前只跑 macOS,Linux/Windows 在路上。",
@@ -507,7 +558,7 @@ const I18N = {
     retrigger:"再触发一次", hideTip:"隐藏弹窗",
   },
   en: {
-    nav_why:"Why", nav_how:"How", nav_compare:"Compare", nav_safety:"Safety", nav_cta:"Install now →",
+    nav_why:"Why", nav_how:"How", nav_compare:"Compare", nav_thesis:"Thesis", nav_safety:"Safety", nav_cta:"Install now →",
     hero_eyebrow:"v0 · kàndǒng · for Mac + Claude Code users",
     hero_h1:'Point at anything,<br><span class="hl">get it explained</span>.<br><span class="strike">No more clueless “continue”</span>.',
     hero_sub:'For non-technical people. In Claude Code, select anything you don’t get and hit a hotkey — <b>plain words in seconds</b>. When cc wants to act, it tells you what it does, the risk, and whether to allow it. <b>It has memory too — it remembers what trips you up and sums up what you’ve learned.</b>',
@@ -531,6 +582,26 @@ const I18N = {
     cmp_label:"How we’re different",
     cmp_h2:"We’re not fighting for the same user.",
     cmp_p:'Other AI tools assume you “want to do something.” We assume you’re “already doing it, but need to understand it.”',
+    th_label:"Origin · Bet · Analysis",
+    th_h2:'Why we built it, <span class="mk">what we bet on</span>, how we read it.',
+    th_p:"Not buried in an investor deck — the thinking behind this product, laid out for you, every line checkable yourself.",
+    thesis:[
+      {n:"01", k:"Why build this",
+       h:"The tool got strong overnight. People didn’t catch up.",
+       body:'Claude Code dropped the bar for “being able to code” to nearly zero — but not the bar for “understanding what you’re doing.” Non-technical people can now get cc to write working things, yet keep freezing at a wall of red, an English term, or a <b>Do you want to proceed</b> — and just click continue on a hunch. What’s missing isn’t a smarter model. It’s a human layer you can <b>see, stop, and understand</b>. That’s the layer we add.'},
+      {n:"02", k:"What we expect",
+       h:'Not betting “more people want to code” — but “people already using it want to understand it.”',
+       body:'We won’t try to convince newcomers to learn programming — that’s the turf of tutorials and Copilot. We bet on a narrower, realer need: <b>non-technical people already using cc who click “continue” clueless every day</b>. The path: start with the smallest wedge (point-and-explain in the terminal), then keep them with <b>local personalization that gets to know you</b>. Success isn’t a DAU spike — it’s <b>people who can’t bear to uninstall</b>, because it remembers what trips them up.'},
+      {n:"03", k:"Analysis",
+       h:"Why now, and why this wedge.",
+       body:"Four calls — each one you can check yourself:",
+       points:[
+         '<b>Timing:</b> agents like cc just pulled in a wave of non-technical users; their “I don’t get it” is a brand-new pain nobody’s seriously serving yet.',
+         '<b>Wedge:</b> we don’t touch “do it for you” (red ocean) — only “help you understand” (almost no one’s on it). Complexity goes into <b>“more accurate,”</b> not “takes longer.”',
+         '<b>Moat:</b> local personalization — your dictionary, sticking points, and profile all live on your machine; the more you use it the better it knows you, and no one can take that. Not a vertical-industry barrier.',
+         '<b>Risk:</b> it depends on local cc (platform risk) and the trust bar of Accessibility permission. We hedge with <b>fully open source + content never leaves + one-step uninstall</b>.',
+       ]},
+    ],
     ins_label:"Install · macOS",
     ins_h2:"One message — your cc installs it.",
     ins_p:"Needs Claude Code already installed and logged in (any plan). v0 is macOS-only for now; Linux/Windows on the way.",
@@ -698,6 +769,12 @@ function applyLang(){
   ct += rows.map(r=>"<tr>"+r.map((cell,j)=>`<td class="${j===0?'row-label':''} ${j===r.length-1?'us':''}">${mark(cell)}</td>`).join("")+"</tr>").join("");
   ct += "</tbody>";
   $("#compTable").innerHTML = ct;
+  // thesis · 缘起 / 预期 / 分析
+  $("#thesisGrid").innerHTML = T().thesis.map(b=>{
+    const pts = b.points ? `<ul>${b.points.map(p=>`<li>${p}</li>`).join("")}</ul>` : "";
+    return `<div class="thesis-block"><div class="thesis-side"><div class="tnum">${b.n}</div><div class="tkick">${b.k}</div></div>`
+      + `<div class="thesis-main"><h3>${b.h}</h3><p>${b.body}</p>${pts}</div></div>`;
+  }).join("");
   // install
   $("#installGrid").innerHTML = T().ins.map(s=>
     `<div class="step"><div class="num">STEP ${s.n}</div><h4>${s.h}</h4><p>${s.p}</p><div class="cmd">${s.cmd}</div></div>`).join("");
