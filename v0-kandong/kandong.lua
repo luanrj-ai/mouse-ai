@@ -112,7 +112,7 @@ end
 --   1) 只更新"标准安装路径"的副本(~/.hammerspoon/mouse-ai/kandong.lua)。从别处加载(如开发机
 --      直接 dofile 仓库文件)时整段 no-op,绝不覆盖开发副本。
 --   2) 替换前校验(非空、够长、含已知标志),坏下载绝不顶上去;旧版先备份成 .bak。
-local KANDONG_BUILD  = 3   -- 每次发版 +1;远端 build 比这个大才更新
+local KANDONG_BUILD  = 4   -- 每次发版 +1;远端 build 比这个大才更新
 local UPDATE_RAW_URL = "https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/v0-kandong/kandong.lua"
 local installPath    = home .. "/.hammerspoon/mouse-ai/kandong.lua"
 local updateStateF   = cfgDir .. "/update_check"   -- 记最近一次检查日期(每天最多查一次)
@@ -564,6 +564,77 @@ local function bumpNeedsDeeper(sel)
     local f = io.open(needsDeeperFile, "w"); if f then f:write(hs.json.encode(d)); f:close() end
   end)
 end
+-- ===== 自进化:让"卡点主题"自己长 =====
+-- 写死的 5 类(PROFILE_CATS)发现不了新主题。这里后台让 cc 把你真实的卡点日志聚类成你自己的
+-- 具体主题(如"异步/Promise""TypeScript 类型"),存盘;personalProfile 优先用它。攒够新条目才重聚,
+-- 纯后台不卡界面;没聚过/失败则回退写死分类。全本地、不上传。
+local discoveredFile = cfgDir .. "/discovered_topics.json"
+local DISCOVER_INSTR = "下面是用户用 Claude Code 时,一条条看不懂、需要解释的内容(每行一条)。提炼出他最近反复卡的 3-5 个【具体】主题——用具体的词(如「异步/Promise」「TypeScript 类型」「git rebase」「Docker 网络」),不要泛泛的大类(别用「报错」「命令」这种)。只输出一个 JSON 字符串数组,例如 [\"异步/Promise\",\"环境变量\"],别的什么都别输出。"
+
+local function loadDiscovered()
+  local f = io.open(discoveredFile, "r"); if not f then return nil end
+  local raw = f:read("*a") or ""; f:close()
+  local ok, t = pcall(hs.json.decode, raw)
+  if ok and type(t) == "table" and type(t.topics) == "table" then return t end
+  return nil
+end
+
+-- 读卡点日志的 preview(排除 summary 自己),返回 {previews, 总行数}
+local function readConfusions(maxN)
+  local f = io.open(logFile, "r"); if not f then return {}, 0 end
+  local lines = {}
+  for ln in f:lines() do lines[#lines + 1] = ln end
+  f:close()
+  local total, out = #lines, {}
+  for i = math.max(1, total - (maxN or 100) + 1), total do
+    local ok, o = pcall(hs.json.decode, lines[i])
+    if ok and type(o) == "table" and o.preview and o.mode ~= "summary" then out[#out + 1] = o.preview end
+  end
+  return out, total
+end
+
+local discovering = false
+local function discoverTopics()
+  if discovering then return end
+  local previews, total = readConfusions(100)
+  if #previews < 8 then return end                       -- 信号太少不聚类
+  discovering = true
+  local tmp = selFile .. ".discover." .. tostring(hs.timer.absoluteTime())
+  local wf = io.open(tmp, "w"); if not wf then discovering = false; return end
+  wf:write(table.concat(previews, "\n")); wf:close()
+  local pathFix = "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH:" .. home .. "/.local/bin; "
+  local cmd = pathFix .. "cat " .. tmp .. " | '" .. claudePath
+    .. "' -p --model haiku --effort low --no-session-persistence --disable-slash-commands --tools '' --no-chrome '"
+    .. DISCOVER_INSTR .. "'"
+  hs.task.new("/bin/sh", function(code, out, err)
+    discovering = false
+    pcall(function() os.remove(tmp) end)
+    pcall(function()
+      local jsonPart = (out or ""):match("%[.-%]")       -- 抠出第一个 [...]
+      if not jsonPart then return end
+      local ok, arr = pcall(hs.json.decode, jsonPart)
+      if not ok or type(arr) ~= "table" then return end
+      local topics = {}
+      for _, v in ipairs(arr) do
+        if type(v) == "string" and #v > 0 and #v < 30 then topics[#topics + 1] = v end
+      end
+      if #topics == 0 then return end
+      local rec = { topics = topics, n = total, ts = os.date("!%Y-%m-%dT%H:%M:%SZ") }
+      local f = io.open(discoveredFile, "w"); if f then f:write(hs.json.encode(rec)); f:close() end
+    end)
+  end, { "-c", cmd }):start()
+end
+
+-- 攒够 15 条新卡点(或从没聚过且已有 >=8 条)就后台重聚一次
+local function maybeDiscoverTopics()
+  pcall(function()
+    local _, total = readConfusions(1)
+    local d = loadDiscovered()
+    local last = d and tonumber(d.n) or 0
+    if total >= 8 and (total - last) >= 15 then discoverTopics() end
+  end)
+end
+
 local function personalProfile()
   local prof = ""
   pcall(function()
@@ -583,6 +654,12 @@ local function personalProfile()
     end
     if total < 5 then return end
     local topics = topNames(cat, 3, 1)
+    -- 自进化:有 cc 聚类出的真实主题就优先用它(比写死的 5 类具体得多),否则回退写死分类
+    local disc = loadDiscovered()
+    if disc and disc.topics and #disc.topics > 0 then
+      topics = {}
+      for i = 1, math.min(4, #disc.topics) do topics[#topics + 1] = disc.topics[i] end
+    end
     local stacks = topNames(stack, 2, 3)        -- 技术栈需 >=3 次才算,更稳
     if #topics == 0 and #stacks == 0 then return end
     prof = "(读者是非技术用户"
@@ -772,6 +849,7 @@ local function runClaude(sel, mode)
     teleSend("explained", { mode = mode, source = usedSource, ok = true,
       sel_len = lenBucket(#sel), ans_len = lenBucket(#trimmed) })
     if mode == "quick" then savePersonal(sel, trimmed) end   -- 存进个人词典,下次秒出
+    pcall(maybeDiscoverTopics)   -- 自进化:攒够新卡点就后台重聚一次「你的卡点主题」
   end
 
   -- 热进程优先:haiku 那几种 + 没走中转 + 常驻进程活着时,复用它省冷启动;失败/超时自动回退一次性。
@@ -1098,6 +1176,9 @@ autoUpdate()
 -- 预热:加载时就起一个常驻 claude,连第一次 ⌥? 都免冷启动(失败也无妨,会自动回退一次性)
 warmStart()
 
+-- 自进化:加载后台聚类一次「你的卡点主题」(攒够新条目才真跑,纯后台)
+hs.timer.doAfter(8, function() pcall(maybeDiscoverTopics) end)
+
 -- 测试钩子:可用 hs CLI 触发,验证"浮窗+调 cc"链路,无需辅助功能/无需选中
 function kandongExplainText(txt, mode) runClaude(txt, mode or "quick") end
 function kandongSummarize() summarize() end
@@ -1105,6 +1186,9 @@ function kandongMd(s) return mdToHtml(s) end
 function kandongSmart() smart() end
 function kandongPending(t) return looksPending(t) and true or false end
 function kandongLocal(s) return lookupLocal(s) end
+function kandongDiscover() discoverTopics() end
+function kandongDiscovered() return hs.json.encode(loadDiscovered() or {}) end
+function kandongProfile() return personalProfile() end
 function kandongProfile() return personalProfile() end
 function kandongPersonalGet(s) return lookupPersonal(s) end
 function kandongPersonalSave(s, a) savePersonal(s, a) end
