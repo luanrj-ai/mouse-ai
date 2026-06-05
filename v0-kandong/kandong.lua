@@ -112,7 +112,7 @@ end
 --   1) 只更新"标准安装路径"的副本(~/.hammerspoon/mouse-ai/kandong.lua)。从别处加载(如开发机
 --      直接 dofile 仓库文件)时整段 no-op,绝不覆盖开发副本。
 --   2) 替换前校验(非空、够长、含已知标志),坏下载绝不顶上去;旧版先备份成 .bak。
-local KANDONG_BUILD  = 2   -- 每次发版 +1;远端 build 比这个大才更新
+local KANDONG_BUILD  = 3   -- 每次发版 +1;远端 build 比这个大才更新
 local UPDATE_RAW_URL = "https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/v0-kandong/kandong.lua"
 local installPath    = home .. "/.hammerspoon/mouse-ai/kandong.lua"
 local updateStateF   = cfgDir .. "/update_check"   -- 记最近一次检查日期(每天最多查一次)
@@ -601,6 +601,62 @@ local function personalProfile()
   return prof
 end
 
+-- ===== 热进程:常驻一个 claude(stream-json 输入/输出),免每次 ~4.5s 冷启动 =====
+-- 只服务 haiku 那几种快查;详细版/中转不走。任何异常/超时都回退一次性路径,保证不比现在差。
+-- 只缓冲+解析、不做浮窗实时渲染(避开流式渲染卡死),收到 result 再一次性出卡。
+local WARM_FLAGS = "-p --input-format stream-json --output-format stream-json --verbose "
+  .. "--model haiku --effort low --no-session-persistence --tools '' --no-chrome --disable-slash-commands"
+local warmTask, warmBuf, warmBusy, warmCb = nil, "", false, nil
+
+local function warmAlive() return warmTask ~= nil and warmTask:isRunning() end
+
+local function warmHandleLine(line)
+  if #line == 0 then return end
+  local ok, obj = pcall(hs.json.decode, line)
+  if not ok or type(obj) ~= "table" then return end
+  if obj.type == "result" then          -- 一个 turn 收尾
+    local cb = warmCb
+    warmCb = nil; warmBusy = false
+    if cb then pcall(cb, obj.result, obj.subtype) end
+  end
+end
+
+local function warmStart()
+  if warmAlive() then return end
+  warmTask, warmBuf, warmBusy, warmCb = nil, "", false, nil
+  local launch = "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH:" .. home
+    .. "/.local/bin; exec '" .. claudePath .. "' " .. WARM_FLAGS
+  warmTask = hs.task.new("/bin/sh", function(c, o, e)
+    warmTask = nil
+    local cb = warmCb; warmCb = nil; warmBusy = false
+    if cb then pcall(cb, nil, "exited") end           -- 进程死了→在途请求失败→回退
+  end, function(t, so, se)
+    pcall(function()
+      if so and #so > 0 then
+        warmBuf = warmBuf .. so
+        while true do
+          local nl = warmBuf:find("\n", 1, true)
+          if not nl then break end
+          warmHandleLine(warmBuf:sub(1, nl - 1)); warmBuf = warmBuf:sub(nl + 1)
+        end
+      end
+    end)
+    return true
+  end, { "-c", launch })
+  pcall(function() warmTask:start() end)
+end
+
+-- 给热进程发一条请求。受理→true(稍后回调 onDone(result, subtype));忙/没活着→false(调用方回退)。
+local function warmAsk(prompt, onDone)
+  if not warmAlive() or warmBusy then return false end
+  warmBusy = true; warmCb = onDone
+  local msg = hs.json.encode({ type = "user", message = { role = "user", content = prompt } }) .. "\n"
+  if not pcall(function() warmTask:setInput(msg) end) then
+    warmBusy = false; warmCb = nil; return false
+  end
+  return true
+end
+
 local function runClaude(sel, mode)
   -- 本地秒答:quick 先查词典,命中就 0ms 显示、不打网络(仍记飞轮)
   if mode == "quick" then
@@ -716,6 +772,29 @@ local function runClaude(sel, mode)
     teleSend("explained", { mode = mode, source = usedSource, ok = true,
       sel_len = lenBucket(#sel), ans_len = lenBucket(#trimmed) })
     if mode == "quick" then savePersonal(sel, trimmed) end   -- 存进个人词典,下次秒出
+  end
+
+  -- 热进程优先:haiku 那几种 + 没走中转 + 常驻进程活着时,复用它省冷启动;失败/超时自动回退一次性。
+  if mode ~= "deep" and not relayModelFor(mode) and warmAlive() then
+    local function warmFallback()
+      if done then return end
+      local cmd = pathFix .. "cat " .. myFile .. " | '" .. claudePath .. "' -p " .. modelFlag .. "'" .. instr .. "'"
+      task = hs.task.new("/bin/sh", function(code, out, err) finish(out, err, false) end, { "-c", cmd })
+      task:start()
+    end
+    killer = hs.timer.doAfter(12, warmFallback)        -- 12s 没回 → 回退
+    local accepted = warmAsk(instr .. "\n\n" .. sel, function(result, subtype)
+      if done then return end
+      if killer then killer:stop(); killer = nil end
+      local r = result and tostring(result) or ""
+      if subtype == "success" and #(r:gsub("%s", "")) > 0 then
+        usedSource = "claude_warm"; finish(r, nil, false)
+      else
+        warmFallback()
+      end
+    end)
+    if accepted then return end
+    if killer then killer:stop(); killer = nil end
   end
 
   if streaming then
@@ -847,9 +926,29 @@ local function secureInputCard()
     "Esc 关闭", false)
 end
 
--- 抓当前选中文字:先存剪贴板 → 模拟 ⌘C → 读 → 还原(全异步,不卡界面)
+-- 用辅助功能直接读前台聚焦元素的选中文字(不发按键、不碰剪贴板 → 不触发"没东西可复制"的 beep,也更快)。
+-- 返回:选中的字符串 / "" (终端暴露选区但当前没选) / nil (终端不暴露选区,需退回 ⌘C 方式)。
+local function axSelectedText()
+  local app = hs.application.frontmostApplication()
+  if not app then return nil end
+  local ax = hs.axuielement.applicationElement(app)
+  if not ax then return nil end
+  local ok, focused = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
+  if not ok or not focused then return nil end
+  local ok2, sel = pcall(function() return focused:attributeValue("AXSelectedText") end)
+  if ok2 and type(sel) == "string" then return sel end
+  return nil
+end
+
+-- 抓当前选中文字。优先 AX 直读(暴露选区的终端走这条,永不发 ⌘C → 没 beep、更快);
+-- 不暴露选区的终端(如 Ghostty)才退回:先存剪贴板 → 模拟 ⌘C → 读 → 还原(全异步,不卡界面)。
 -- 抓不到时把 secure(是否开了安全键盘输入)回传给上层,据此提示而非默默读整屏。
 local function withSelection(fn)
+  local axSel = axSelectedText()
+  if axSel ~= nil then
+    if axSel ~= "" then fn(axSel) else fn(nil, secureInputOn()) end
+    return
+  end
   local saved = hs.pasteboard.getContents()
   hs.pasteboard.clearContents()
   hs.eventtap.keyStroke({ "cmd" }, "c", 0)
@@ -995,6 +1094,9 @@ hs.alert.show("看懂已就绪  ·  ⌥? 解释/看屏  ·  ⌘⌥? 详细  ·  
 
 -- 启动后台查一次更新(每天最多一次;非标准安装路径自动跳过,不影响开发副本)
 autoUpdate()
+
+-- 预热:加载时就起一个常驻 claude,连第一次 ⌥? 都免冷启动(失败也无妨,会自动回退一次性)
+warmStart()
 
 -- 测试钩子:可用 hs CLI 触发,验证"浮窗+调 cc"链路,无需辅助功能/无需选中
 function kandongExplainText(txt, mode) runClaude(txt, mode or "quick") end
