@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>mouseAI · 指哪解释哪的鼠标 Agent</title>
+<title>mouseAI · 任何窗口,划选就懂</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -444,9 +444,9 @@
 const I18N = {
   cn: {
     nav_why:"为什么", nav_how:"怎么用", nav_compare:"对比", nav_thesis:"缘起", nav_safety:"安全", nav_cta:"立即安装 →",
-    hero_eyebrow:"v0 · 看懂 · 给 Mac + 已在用 Claude Code 的人",
-    hero_h1:'<span class="nb">在终端里<span class="hl">指哪解释哪</span>。</span><br><span class="nb">不用切窗口、</span><br><span class="nb"><span class="strike">不用稀里糊涂点继续</span>。</span>',
-    hero_sub:'给不懂技术的人用。在 Claude Code 里划选看不懂的东西、按下快捷键,<b>几秒内大白话讲清</b>;cc 要动手时,告诉你它要干嘛、有没有风险、该不该放行。<b>它还有记忆——记住你常卡的地方,帮你总结学到了什么。</b>',
+    hero_eyebrow:"v0 · 看懂 · 给不懂技术、又在用 Claude Code 的人",
+    hero_h1:'<span class="nb">看不懂的,</span><span class="nb"><span class="hl">划选一下就懂</span>。</span><br><span class="nb">浏览器、PDF、报错——</span><span class="nb">任何窗口。</span>',
+    hero_sub:'专门给不懂技术的人。浏览器、终端、PDF——<b>任何窗口</b>里划选看不懂的东西、按下快捷键,<b>几秒内大白话讲清</b>。遇到 Claude Code 要动手时,它还会告诉你:这操作干嘛、有没有风险、该不该放行。<b>越用越懂你——记住你常卡的地方。</b>',
     hero_cta1:"让 cc 帮你装 →", hero_cta2:"先看看怎么用",
     hero_meta:'复用本机 <span class="kbd-inline">Claude Code</span> · 零 API key · 内容不经我们手',
     ccPrompt:"帮我在 macOS 上装 mouseAI(看懂):\n1) 运行 brew install --cask hammerspoon\n2) 运行 curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash\n3) 打开 Hammerspoon,再帮我打开「系统设置 → 隐私与安全性 → 辅助功能」,告诉我把哪个开关打开(这步只能我自己点)。\n装好后告诉我 ⌥? / ⌘⌥? / ⌘? 三个快捷键怎么用。",
@@ -464,13 +464,13 @@ const I18N = {
     ins_manual_summary:"想自己一步步装?(给愿意看命令的人)",
     why_label:"为什么是 mouseAI",
     why_h2:'不是新 AI,是给你一个<span class="mk">看得见的把手</span>',
-    why_p:'非技术的人用 cc 最大的问题不是"做不出来",是<b>不知道刚才那一屏到底是怎么回事</b>。我们补的是这一层。',
-    answer_h:'cc 的"翻译官 + 拦路员"',
-    answer_p:'不替你写代码,不替你做决定——但保证你<b>每一步都知道自己在同意什么</b>。',
+    why_p:'非技术的人用电脑最大的问题不是"做不出来",是<b>满屏看不懂的字,不知道是什么意思、要不要紧</b>。哪个窗口都一样——网页、报错、cc 的提示。我们补的是这一层。',
+    answer_h:'你屏幕的"翻译官"——cc 动手时,还是"拦路员"',
+    answer_p:'任何看不懂的,划一下就给你大白话;遇到 cc 要执行操作,额外告诉你风险、该不该放行。<b>每一步都知道自己在同意什么。</b>',
     answer_cta:"看 3 个用法 →",
     how_label:"怎么用 · 3 个快捷键",
     how_h2:"装好之后,你只需要记住三个键。",
-    how_p:"没有面板、没有侧边栏、没有要登录的网页。它就藏在你终端的快捷键里,要的时候按一下。",
+    how_p:"没有面板、没有侧边栏、没有要登录的网页。它是<b>全局快捷键</b>,在哪个窗口都能按,要的时候按一下。",
     cmp_label:"和其他东西不一样在哪",
     cmp_h2:"我们不和别人抢同一个用户。",
     cmp_p:'市面上的 AI 工具都假设你"想做什么",我们假设你"已经在做什么,但需要看懂"。',
@@ -483,7 +483,7 @@ const I18N = {
        body:'Claude Code 把"会编程"的门槛拉到了几乎为零——但没把"看懂自己在干什么"的门槛拉低。非技术的人现在能让 cc 写出能跑的东西,却常常卡在一屏报错、一个英文术语、一句 <b>Do you want to proceed</b> 前面,只能凭感觉点继续。缺的不是更强的模型,是一层<b>看得见、拦得住、解释得清</b>的人机接口。我们补这一层。'},
       {n:"02", k:"预期",
        h:'不赌"更多人想编程",赌"已经在用的人想看懂"。',
-       body:'我们不打算说服新人来学编程——那是教程和 Copilot 的战场。我们赌一个更窄、更真的需求:<b>已经在用 cc、但每天都在"稀里糊涂点继续"的非技术用户</b>。路径是先做最小切口(终端里指哪解释哪),再靠<b>"越用越懂你"的本地个性化</b>留住人。成功的样子不是 DAU 暴涨,是<b>有人舍不得卸</b>——因为它记住了你常卡的地方。'},
+       body:'我们不打算说服新人来学编程——那是教程和 Copilot 的战场。我们赌一个更窄、更真的需求:<b>已经在用 cc、但每天都在"稀里糊涂点继续"的非技术用户</b>。路径是先做最小切口(任何窗口指哪解释哪),再靠<b>"越用越懂你"的本地个性化</b>留住人。成功的样子不是 DAU 暴涨,是<b>有人舍不得卸</b>——因为它记住了你常卡的地方。'},
       {n:"03", k:"分析",
        h:"为什么是现在、为什么是这个切口。",
        body:"把判断拆成四条,每条你都能自己验证:",
@@ -508,8 +508,8 @@ const I18N = {
       {h:"另一个 cc 套壳", p:"不是。cc 不需要被套壳,它已经够好了。差的是一层看得见、拦得住、解释得清的人机接口。"},
     ],
     hot:[
-      {keys:["⌥","?"], h:"指哪解释哪", d:"主键。划选屏幕上任意一段(术语/代码/报错),按它,弹窗给你一句大白话;什么都不选直接按,它读最近的屏幕,告诉你 cc 在干嘛。",
-       ex:'"<span class="arrow">staged for commit</span>" → "已经准备好、但还没保存的修改"'},
+      {keys:["⌥","?"], h:"指哪解释哪", d:"主键。在任何窗口——浏览器、PDF、终端——划选看不懂的一段(术语/外语/代码/报错),按它,弹窗给你一句大白话;在终端里什么都不选直接按,它读最近的屏幕,告诉你 cc 在干嘛。",
+       ex:'"<span class="arrow">idempotent</span>" → "做一次和做多次,结果都一样"'},
       {keys:["⌘","⌥","?"], h:"要详细就按它", d:"选中后按给完整解释:它是什么、为什么出现、要不要紧、该怎么办;什么都不选直接按,它会稍详细地讲整屏在干嘛。",
        ex:'20 行报错 → "<span class="arrow">显卡内存不够,batch_size 调小</span>"'},
       {keys:["⌘","?"], h:"看我最近卡在哪", d:"读你过去问过的东西,归纳你最近主要卡在哪几类——像一面「学习镜子」,越用越懂你。",
@@ -517,8 +517,8 @@ const I18N = {
     ],
     cmp_cols:["", "Copilot 类", "编程教程", "通用 ChatGPT", "mouseAI"],
     cmp_rows:[
-      ["面向用户","会写代码的开发者","想学编程的人","所有人(含非技术)","非技术的 cc 用户"],
-      ["解决什么","帮你写代码","教你写代码","通用助手","帮你看懂 cc 在干啥"],
+      ["面向用户","会写代码的开发者","想学编程的人","所有人(含非技术)","非技术的人(已装 cc)"],
+      ["解决什么","帮你写代码","教你写代码","通用助手","划选就懂屏幕上看不懂的"],
       ["零 API key","no","no","no","yes"],
       ["内容不进我们服务器","partial","no","no","yes"],
       ["对接 cc 权限流","no","no","no","yes"],
@@ -528,7 +528,7 @@ const I18N = {
       {n:"01",h:"装 Hammerspoon",p:"macOS 下免费开源的快捷键引擎。",cmd:"brew install --cask hammerspoon"},
       {n:"02",h:"拉 mouseAI v0",p:"一行命令,放到配置目录里。",cmd:"curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash"},
       {n:"03",h:"授权辅助功能",p:"系统会弹一次窗,允许读屏幕选区。",cmd:"⚙ 系统设置 → 隐私 → 辅助功能"},
-      {n:"04",h:"试一下",p:"打开终端,运行 cc,划选任意一段。",cmd:"⌥ + ?"},
+      {n:"04",h:"试一下",p:"打开浏览器或任意窗口,划选看不懂的一段。",cmd:"⌥ + ?"},
     ],
     saf_label:"它安全吗 · 老实说",
     saf_h2:"在你点「安装」之前,先把话说清楚。",
@@ -544,7 +544,18 @@ const I18N = {
       {q:"想删干净怎么办?", a:"三步,全在本机:删 <code>init.lua</code> 那一行;(可选)还原 cc 的 <code>settings.json</code>;关掉辅助功能权限。<b>没有账号要注销,没有服务器留你数据。</b>"},
     ],
     scenarios:{
-      explain:{label:"解释术语", kbd:"⌥?", hint:"划选下面带高亮的词,按 ⌥? 看解释",
+      browser:{label:"看懂网页", kbd:"⌥?", src:"Chrome", hint:"在网页上划选看不懂的英文/术语,按 ⌥? 看解释",
+        title:"一句话解释",
+        body:'"<b>idempotent</b>"(幂等)= 同样的操作做一次和做很多次,<b>结果都一样</b>。<br><br>就像电梯按钮按一下和按五下,电梯还是只来一次。常用来说"重复执行也安全"的接口。',
+        verdict:null,
+        lines:[
+          {t:"Designing Robust APIs",c:""},{t:"",c:""},
+          {t:"A well-designed endpoint should be",c:""},
+          {t:"idempotent: calling it many times has the",c:"",sel:"idempotent"},
+          {t:"same effect as calling it once. This is",c:""},
+          {t:"what makes safe retries possible.",c:""},
+        ]},
+      explain:{label:"解释术语", kbd:"⌥?", src:"终端", hint:"划选下面带高亮的词,按 ⌥? 看解释",
         title:"一句话解释",
         body:'"<b>ahead of origin</b>" = 你本地做了 2 次提交,但还<b>没推到云端</b>。<br><br>就像写完两页日记还放在抽屉里,GitHub 那边的副本还是旧的。运行 <code>git push</code> 就能同步过去。',
         verdict:null,
@@ -555,7 +566,7 @@ const I18N = {
           {t:"Your branch is ahead of 'origin/main' by 2 commits.",c:"",sel:"ahead of"},
           {t:'  (use "git push" to publish your local commits)',c:"dim"},
         ]},
-      permission:{label:"权限请求", kbd:"⌥?", hint:"什么都不选,直接按 ⌥?——它读屏,告诉你 cc 要干嘛、风险、该不该放行",
+      permission:{label:"权限请求", kbd:"⌥?", src:"终端", hint:"什么都不选,直接按 ⌥?——它读屏,告诉你 cc 要干嘛、风险、该不该放行",
         title:"它要干嘛?",
         body:'它要 <b>删除整个 test-db 文件夹的所有内容</b>(含子文件夹)。<br><br><b>风险:</b>不可恢复。路径错了或里面有真数据就救不回来。<br><br><b>建议:</b>先 <code>ls /var/lib/test-db/</code> 看一眼里面是什么。',
         verdict:{kind:"warn", t:"⚠  危险操作 · 建议谨慎放行"},
@@ -567,7 +578,7 @@ const I18N = {
           {t:"  Do you want to proceed?",c:""},{t:"  ❯ 1. Yes",c:""},
           {t:"    2. No, tell Claude what to do",c:"dim"},
         ]},
-      error:{label:"看懂报错", kbd:"⌥?", hint:"红色一片不知道哪行重要?选中按 ⌥? 看懂(要更详细按 ⌘⌥?)",
+      error:{label:"看懂报错", kbd:"⌥?", src:"终端", hint:"红色一片不知道哪行重要?选中按 ⌥? 看懂(要更详细按 ⌘⌥?)",
         title:"这报错说啥",
         body:'<b>显卡内存不够了。</b><br><br>你的显卡共 8GB,已被占 7.2GB,要再分 2.5GB 装不下。<br><br><b>常见解决:</b>把 <code>batch_size</code> 调小一半,或重启脚本释放没回收的内存。',
         verdict:null,
@@ -586,9 +597,9 @@ const I18N = {
   },
   en: {
     nav_why:"Why", nav_how:"How", nav_compare:"Compare", nav_thesis:"Thesis", nav_safety:"Safety", nav_cta:"Install now →",
-    hero_eyebrow:"v0 · kàndǒng · for Mac + Claude Code users",
-    hero_h1:'Point at anything,<br><span class="hl">get it explained</span>.<br><span class="strike">No more clueless “continue”</span>.',
-    hero_sub:'For non-technical people. In Claude Code, select anything you don’t get and hit a hotkey — <b>plain words in seconds</b>. When cc wants to act, it tells you what it does, the risk, and whether to allow it. <b>It has memory too — it remembers what trips you up and sums up what you’ve learned.</b>',
+    hero_eyebrow:"v0 · kàndǒng · for non-technical people who use Claude Code",
+    hero_h1:'<span class="nb">Don’t get it?</span> <span class="nb"><span class="hl">Select it, get it</span>.</span><br><span class="nb">Browser, PDF, errors —</span> <span class="nb">any window.</span>',
+    hero_sub:'For non-technical people. In any window — browser, terminal, PDF — select anything you don’t get and hit a hotkey for <b>plain words in seconds</b>. When Claude Code wants to act, it also tells you what it does, the risk, and whether to allow it. <b>The more you use it, the better it knows what trips you up.</b>',
     hero_cta1:"Tell your cc to install it →", hero_cta2:"See how it works",
     hero_meta:'Uses your local <span class="kbd-inline">Claude Code</span> · zero API keys · your content never reaches us',
     ccPrompt:"Install mouseAI on macOS for me:\n1) run brew install --cask hammerspoon\n2) run curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash\n3) open Hammerspoon, then open System Settings → Privacy & Security → Accessibility and tell me which toggle to turn on (only I can click this).\nThen tell me how to use the three hotkeys ⌥? / ⌘⌥? / ⌘?.",
@@ -606,13 +617,13 @@ const I18N = {
     ins_manual_summary:"Prefer to install it yourself, step by step? (for people who like commands)",
     why_label:"Why mouseAI",
     why_h2:'Not a new AI — a <span class="mk">handle you can see</span>',
-    why_p:'For non-technical people, the hard part of using cc isn’t “getting it done” — it’s <b>not knowing what just happened on screen</b>. That’s the layer we add.',
-    answer_h:'cc’s translator + gatekeeper',
-    answer_p:'It doesn’t write your code or make your decisions — it just makes sure you <b>always know what you’re saying yes to</b>.',
+    why_p:'For non-technical people, the hard part isn’t “getting it done” — it’s <b>a screen full of words you don’t understand, not knowing what they mean or whether they matter</b>. Same in any window — a web page, an error, a cc prompt. That’s the layer we add.',
+    answer_h:'Your screen’s translator — and cc’s gatekeeper when it acts',
+    answer_p:'Anything you don’t get, select it for plain words; when cc wants to run something, it also flags the risk and whether to allow it. <b>You always know what you’re saying yes to.</b>',
     answer_cta:"See the 3 uses →",
     how_label:"How it works · 3 hotkeys",
     how_h2:"Once it’s set up, you only remember three keys.",
-    how_p:"No panel, no sidebar, no website to log into. It lives in your terminal’s hotkeys — press one when you need it.",
+    how_p:"No panel, no sidebar, no website to log into. They’re <b>global hotkeys</b> — they work in any window. Press one when you need it.",
     cmp_label:"How we’re different",
     cmp_h2:"We’re not fighting for the same user.",
     cmp_p:'Other AI tools assume you “want to do something.” We assume you’re “already doing it, but need to understand it.”',
@@ -625,7 +636,7 @@ const I18N = {
        body:'Claude Code dropped the bar for “being able to code” to nearly zero — but not the bar for “understanding what you’re doing.” Non-technical people can now get cc to write working things, yet keep freezing at a wall of red, an English term, or a <b>Do you want to proceed</b> — and just click continue on a hunch. What’s missing isn’t a smarter model. It’s a human layer you can <b>see, stop, and understand</b>. That’s the layer we add.'},
       {n:"02", k:"What we expect",
        h:'Not betting “more people want to code” — but “people already using it want to understand it.”',
-       body:'We won’t try to convince newcomers to learn programming — that’s the turf of tutorials and Copilot. We bet on a narrower, realer need: <b>non-technical people already using cc who click “continue” clueless every day</b>. The path: start with the smallest wedge (point-and-explain in the terminal), then keep them with <b>local personalization that gets to know you</b>. Success isn’t a DAU spike — it’s <b>people who can’t bear to uninstall</b>, because it remembers what trips them up.'},
+       body:'We won’t try to convince newcomers to learn programming — that’s the turf of tutorials and Copilot. We bet on a narrower, realer need: <b>non-technical people already using cc who click “continue” clueless every day</b>. The path: start with the smallest wedge (point-and-explain in any window), then keep them with <b>local personalization that gets to know you</b>. Success isn’t a DAU spike — it’s <b>people who can’t bear to uninstall</b>, because it remembers what trips them up.'},
       {n:"03", k:"Analysis",
        h:"Why now, and why this wedge.",
        body:"Four calls — each one you can check yourself:",
@@ -650,8 +661,8 @@ const I18N = {
       {h:"Another cc wrapper", p:"Nope. cc doesn’t need wrapping — it’s good enough. What’s missing is a layer you can see, stop, and understand."},
     ],
     hot:[
-      {keys:["⌥","?"], h:"Point, and get it", d:"The main key. Select anything (a term, code, an error) and press it for a one-line plain explanation. Select nothing and press it — it reads your recent screen and tells you what cc is doing.",
-       ex:'"<span class="arrow">staged for commit</span>" → "changes that are ready but not saved yet"'},
+      {keys:["⌥","?"], h:"Point, and get it", d:"The main key. In any window — browser, PDF, terminal — select anything you don’t get (a term, foreign words, code, an error) and press it for a one-line plain explanation. In a terminal, select nothing and press it — it reads your recent screen and tells you what cc is doing.",
+       ex:'"<span class="arrow">idempotent</span>" → "do it once or many times, same result"'},
       {keys:["⌘","⌥","?"], h:"Press for detail", d:"Select then press for the full picture: what it is, why it showed up, whether it matters, what to do. Select nothing and press — it walks you through the whole screen in a bit more detail.",
        ex:'20-line error → "<span class="arrow">GPU out of memory, lower batch_size</span>"'},
       {keys:["⌘","?"], h:"What I keep getting stuck on", d:"Reads what you’ve asked before and groups it into the few things you get stuck on most — a learning mirror that gets to know you.",
@@ -659,8 +670,8 @@ const I18N = {
     ],
     cmp_cols:["", "Copilot-like", "Tutorials", "General ChatGPT", "mouseAI"],
     cmp_rows:[
-      ["For whom","Developers who code","People learning to code","Everyone","Non-technical cc users"],
-      ["Solves what","Writes code for you","Teaches you to code","General assistant","Helps you read what cc is doing"],
+      ["For whom","Developers who code","People learning to code","Everyone","Non-technical people (with cc)"],
+      ["Solves what","Writes code for you","Teaches you to code","General assistant","Select-to-understand anything on screen"],
       ["Zero API key","no","no","no","yes"],
       ["Nothing to our servers","partial","no","no","yes"],
       ["Hooks cc’s permission flow","no","no","no","yes"],
@@ -670,7 +681,7 @@ const I18N = {
       {n:"01",h:"Install Hammerspoon",p:"A free, open-source hotkey engine for macOS.",cmd:"brew install --cask hammerspoon"},
       {n:"02",h:"Pull mouseAI v0",p:"One line, drops into your config folder.",cmd:"curl -fsSL https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/install.sh | bash"},
       {n:"03",h:"Grant Accessibility",p:"macOS asks once, to let it read your selection.",cmd:"⚙ Settings → Privacy → Accessibility"},
-      {n:"04",h:"Try it",p:"Open a terminal, run cc, select anything.",cmd:"⌥ + ?"},
+      {n:"04",h:"Try it",p:"Open a browser or any window, select anything you don’t get.",cmd:"⌥ + ?"},
     ],
     saf_label:"Is it safe · straight talk",
     saf_h2:"Before you hit “install,” let’s be straight with you.",
@@ -686,7 +697,18 @@ const I18N = {
       {q:"How do I fully remove it?", a:"Three steps, all on your machine: delete that line in <code>init.lua</code>; (optional) restore cc’s <code>settings.json</code>; turn off Accessibility. <b>No account to close, no server holding your data.</b>"},
     ],
     scenarios:{
-      explain:{label:"Explain a term", kbd:"⌥?", hint:"Select the highlighted phrase, press ⌥? to see the explanation",
+      browser:{label:"Read a web page", kbd:"⌥?", src:"Chrome", hint:"On a web page, select a term you don’t get and press ⌥?",
+        title:"In one line",
+        body:'"<b>idempotent</b>" = doing it once and doing it many times have <b>the same effect</b>.<br><br>Like an elevator button — pressing it five times still brings the elevator once. Used for operations that are "safe to repeat."',
+        verdict:null,
+        lines:[
+          {t:"Designing Robust APIs",c:""},{t:"",c:""},
+          {t:"A well-designed endpoint should be",c:""},
+          {t:"idempotent: calling it many times has the",c:"",sel:"idempotent"},
+          {t:"same effect as calling it once. This is",c:""},
+          {t:"what makes safe retries possible.",c:""},
+        ]},
+      explain:{label:"Explain a term", kbd:"⌥?", src:"Terminal", hint:"Select the highlighted phrase, press ⌥? to see the explanation",
         title:"In one line",
         body:'"<b>ahead of origin</b>" = you made 2 commits locally but <b>haven’t pushed them to the cloud</b>.<br><br>Like writing two diary pages but leaving them in a drawer — GitHub’s copy is still old. Run <code>git push</code> to sync.',
         verdict:null,
@@ -697,7 +719,7 @@ const I18N = {
           {t:"Your branch is ahead of 'origin/main' by 2 commits.",c:"",sel:"ahead of"},
           {t:'  (use "git push" to publish your local commits)',c:"dim"},
         ]},
-      permission:{label:"Permission ask", kbd:"⌥?", hint:"Select nothing, just press ⌥? — it reads the screen and tells you what cc wants, the risk, and whether to allow",
+      permission:{label:"Permission ask", kbd:"⌥?", src:"Terminal", hint:"Select nothing, just press ⌥? — it reads the screen and tells you what cc wants, the risk, and whether to allow",
         title:"What does it want?",
         body:'It wants to <b>delete everything inside the test-db folder</b> (including subfolders).<br><br><b>Risk:</b> not recoverable. Wrong path or real data inside = gone.<br><br><b>Suggestion:</b> run <code>ls /var/lib/test-db/</code> first to see what’s in there.',
         verdict:{kind:"warn", t:"⚠  Risky · allow with caution"},
@@ -709,7 +731,7 @@ const I18N = {
           {t:"  Do you want to proceed?",c:""},{t:"  ❯ 1. Yes",c:""},
           {t:"    2. No, tell Claude what to do",c:"dim"},
         ]},
-      error:{label:"Read an error", kbd:"⌥?", hint:"A wall of red? Select it, press ⌥? (or ⌘⌥? for more detail)",
+      error:{label:"Read an error", kbd:"⌥?", src:"Terminal", hint:"A wall of red? Select it, press ⌥? (or ⌘⌥? for more detail)",
         title:"What this error means",
         body:'<b>Your GPU ran out of memory.</b><br><br>It has 8GB total, 7.2GB is already used, and it can’t fit another 2.5GB.<br><br><b>Common fix:</b> halve <code>batch_size</code>, or restart the script to free memory that wasn’t released.',
         verdict:null,
@@ -729,7 +751,7 @@ const I18N = {
 };
 
 let lang = (navigator.language||"").toLowerCase().startsWith("en") ? "en" : "cn";
-let scenario = "explain";
+let scenario = "browser";
 let triggered = false;
 let trigTimer = null;
 
@@ -745,7 +767,7 @@ function escHtml(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").re
 
 function renderDemo(){
   const sc = T().scenarios[scenario];
-  $("#termTitle").textContent = "~ / claude-code · " + sc.label;
+  $("#termTitle").textContent = (sc.src || "~ / claude-code") + " · " + sc.label;
   // body
   let html = "";
   sc.lines.forEach((ln,idx)=>{

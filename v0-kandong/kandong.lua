@@ -112,7 +112,7 @@ end
 --   1) 只更新"标准安装路径"的副本(~/.hammerspoon/mouse-ai/kandong.lua)。从别处加载(如开发机
 --      直接 dofile 仓库文件)时整段 no-op,绝不覆盖开发副本。
 --   2) 替换前校验(非空、够长、含已知标志),坏下载绝不顶上去;旧版先备份成 .bak。
-local KANDONG_BUILD  = 4   -- 每次发版 +1;远端 build 比这个大才更新
+local KANDONG_BUILD  = 5   -- 每次发版 +1;远端 build 比这个大才更新
 local UPDATE_RAW_URL = "https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/v0-kandong/kandong.lua"
 local installPath    = home .. "/.hammerspoon/mouse-ai/kandong.lua"
 local updateStateF   = cfgDir .. "/update_check"   -- 记最近一次检查日期(每天最多查一次)
@@ -192,6 +192,9 @@ local WATCH_INSTR  = "下面是终端画面,末尾有一个 Claude Code 待批�
 local RECENT_INSTR = "下面是终端最近画面(Claude Code 与用户的对话)。用户不懂技术。用中文极简总结,2-4 个短句要点,每点一行短语别写长句:cc 在做什么、到哪步、有没有要你决定的。禁止寒暄、复述英文。markdown 分点。"
 -- ⌘⌥? 没选中时:对整屏做"稍详细"解释(比 RECENT 多一点)
 local SCREEN_INSTR = "下面是终端最近画面(Claude Code 与用户的对话/输出)。用户不懂技术、想看懂这一屏。分 3 小块、每块 1-2 句短话,全部不超过 130 字:1)cc 最近在干嘛、到哪步;2)屏幕上关键词/命令/报错啥意思;3)有没有要你做的决定或风险。禁止逐行复述、禁止复述英文、禁止寒暄、禁止长篇。"
+-- 在浏览器/普通 app 里划选时用的口吻:不提"终端/放行",按"网页上看不懂的东西"来讲
+local QUICK_INSTR_WEB = "下面是用户在网页/文档里选中的看不懂的内容(术语/外语/句子/代码/缩写)。用中文一行说清意思,越短越好,尽量 20 字以内,只给核心、别加括号注释、别完整句子。若是外语,直接给中文意思。禁止任何寒暄铺垫。"
+local DEEP_INSTR_WEB  = "下面是用户在网页/文档里选中、看不懂的内容(术语/外语/句子/代码/缩写)。用中文大白话讲清,最多 4 个要点,每点一句话、单独一行,全部加起来不超过 120 字。讲:是什么意思、为什么这么说/有什么背景、对用户有什么用。若是外语,先给中文意思再补背景。禁止长段、禁止多级标题、禁止寒暄。"
 
 -- ===== 状态 =====
 local popup, escKey, hideTimer
@@ -734,6 +737,22 @@ local function warmAsk(prompt, onDone)
   return true
 end
 
+-- 当前最前面的 app 是不是浏览器(据此把"终端口吻"换成"网页口吻")
+-- 必须定义在 runClaude 之前:Lua 局部函数只在定义行之后可见。
+local BROWSER_IDS = {
+  ["com.apple.Safari"] = true, ["com.google.Chrome"] = true,
+  ["com.microsoft.edgemac"] = true, ["com.brave.Browser"] = true,
+  ["org.mozilla.firefox"] = true, ["company.thebrowser.Browser"] = true,
+  ["company.thebrowser.dia"] = true, ["com.operasoftware.Opera"] = true,
+  ["com.vivaldi.Vivaldi"] = true, ["com.google.Chrome.canary"] = true,
+}
+local function isBrowser()
+  local app = hs.application.frontmostApplication()
+  if not app then return false end
+  local ok, id = pcall(function() return app:bundleID() end)
+  return ok and id ~= nil and BROWSER_IDS[id] == true
+end
+
 local function runClaude(sel, mode)
   -- 本地秒答:quick 先查词典,命中就 0ms 显示、不打网络(仍记飞轮)
   if mode == "quick" then
@@ -783,6 +802,11 @@ local function runClaude(sel, mode)
   else
     instr, loadTitle, doneTitle, doneFooter = QUICK_INSTR, "解释中…", "大白话", "⌘⌥? 看详细   ·   Esc 关闭"
     modelFlag = "--model haiku --no-session-persistence "  -- 快查用 haiku,更快更省
+  end
+  -- 在浏览器里划选时,把"终端口吻"换成"网页口吻"(不提放行,外语直接给中文意思)
+  if isBrowser() then
+    if mode == "quick" then instr = QUICK_INSTR_WEB
+    elseif mode == "deep" then instr = DEEP_INSTR_WEB end
   end
   -- 越用越懂你:给选中解释(quick/deep)拼一句"个人画像",让 cc 按你的程度讲。
   -- 纯本地计算、不加延迟;画像不含单引号,拼进单引号包裹的 shell 命令里安全。
@@ -1088,6 +1112,11 @@ local function smart()
       return
     end
     if secure then secureInputCard(); return end
+    -- 浏览器里没选中:不去找 cc 权限请求/读终端屏(会答非所问),直接引导划选
+    if isBrowser() then
+      showCard("在浏览器里", "划选一段看不懂的(术语/外语/句子),再按 ⌥? 我来解释;⌘⌥? 看更详细。", "Esc 关闭", false)
+      return
+    end
     local text = readScreenText()
     if not text or #text < 20 then
       showCard("没读到内容", "选一段文字按 ⌘? 我来解释;或在终端里按,我读最近的内容帮你看。", "Esc 关闭", false)
@@ -1111,6 +1140,10 @@ local function smartDeep()
       return
     end
     if secure then secureInputCard(); return end
+    if isBrowser() then
+      showCard("在浏览器里", "划选一段看不懂的(术语/外语/句子),再按 ⌘⌥? 我来详细解释。", "Esc 关闭", false)
+      return
+    end
     local text = readScreenText()
     if not text or #text < 20 then
       showCard("没读到内容", "在终端里按 ⌘⌥? 我会读最近这一屏帮你详细讲;选中一段则详细解释那段。", "Esc 关闭", false)
