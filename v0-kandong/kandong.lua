@@ -112,7 +112,7 @@ end
 --   1) 只更新"标准安装路径"的副本(~/.hammerspoon/mouse-ai/kandong.lua)。从别处加载(如开发机
 --      直接 dofile 仓库文件)时整段 no-op,绝不覆盖开发副本。
 --   2) 替换前校验(非空、够长、含已知标志),坏下载绝不顶上去;旧版先备份成 .bak。
-local KANDONG_BUILD  = 5   -- 每次发版 +1;远端 build 比这个大才更新
+local KANDONG_BUILD  = 6   -- 每次发版 +1;远端 build 比这个大才更新
 local UPDATE_RAW_URL = "https://raw.githubusercontent.com/luanrj-ai/mouse-ai/main/v0-kandong/kandong.lua"
 local installPath    = home .. "/.hammerspoon/mouse-ai/kandong.lua"
 local updateStateF   = cfgDir .. "/update_check"   -- 记最近一次检查日期(每天最多查一次)
@@ -1042,25 +1042,46 @@ local function axSelectedText()
   return nil
 end
 
--- 抓当前选中文字。优先 AX 直读(暴露选区的终端走这条,永不发 ⌘C → 没 beep、更快);
--- 不暴露选区的终端(如 Ghostty)才退回:先存剪贴板 → 模拟 ⌘C → 读 → 还原(全异步,不卡界面)。
--- 抓不到时把 secure(是否开了安全键盘输入)回传给上层,据此提示而非默默读整屏。
+-- 抓当前选中文字,按可靠性优先级走三条路:
+--   ① AX 直读非空 → 用它(浏览器/文本编辑等暴露选区的 app,快、无 beep)。
+--   ② 模拟 ⌘C 抓到 → 用它(Ghostty 等接受模拟键击的终端)。
+--   ③ 都不行,但你"刚手动复制过新东西" → 解释你复制的内容
+--      (Apple Terminal 这类:既不暴露 AX 选区、又忽略模拟 ⌘C,只能你真手按 ⌘C,再按 ⌥? 解释剪贴板)。
+--   ④ 以上全无 + 没新复制 → 才判真没选中,去读全屏(cc 看屏/近况)。
+-- 用剪贴板"变更计数"区分③和④:只有你自上次以来按过真 ⌘C(计数变大),才当成"你想解释这段"。
+-- 基线初始化成当前计数(不能用 nil:否则重载/重启后第一次 ⌥? 永远判 userCopied=false → 读全屏)。
+local prevClipChange = hs.pasteboard.changeCount()
 local function withSelection(fn)
   local axSel = axSelectedText()
-  if axSel ~= nil then
-    if axSel ~= "" then fn(axSel) else fn(nil, secureInputOn()) end
-    return
-  end
-  local saved = hs.pasteboard.getContents()
+  local curChange = hs.pasteboard.changeCount()
+  local userClip = hs.pasteboard.getContents()
+  -- 你自上次以来按过真 ⌘C(剪贴板计数变大且非空)= "你想解释这段"(Apple Terminal 流程)。
+  local userCopied = (curChange > prevClipChange and userClip ~= nil and userClip ~= "")
+  prevClipChange = curChange
+  if axSel ~= nil and axSel ~= "" then fn(axSel); return end
+  -- 先等物理修饰键松开(按 ⌥? 时手还按着 Option/Shift,此刻 ⌘C 会被合成 ⌘⌥⇧C 而失效)。
   hs.pasteboard.clearContents()
-  hs.eventtap.keyStroke({ "cmd" }, "c", 0)
-  hs.timer.doAfter(0.18, function()
-    local sel = hs.pasteboard.getContents()
-    hs.timer.doAfter(0.1, function()
-      if saved ~= nil then hs.pasteboard.setContents(saved) end
+  local function doCopy(tries)
+    local m = hs.eventtap.checkKeyboardModifiers()
+    if (m.cmd or m.alt or m.shift or m.ctrl or m.fn) and tries < 25 then
+      hs.timer.doAfter(0.03, function() doCopy(tries + 1) end)
+      return
+    end
+    hs.eventtap.keyStroke({ "cmd" }, "c", 0)
+    hs.timer.doAfter(0.18, function()
+      local grabbed = hs.pasteboard.getContents()
+      if userClip ~= nil then hs.pasteboard.setContents(userClip) end  -- 还原用户剪贴板
+      hs.timer.doAfter(0.05, function() prevClipChange = hs.pasteboard.changeCount() end)
+      if grabbed ~= nil and grabbed ~= "" then
+        fn(grabbed)                  -- ② 模拟 ⌘C 抓到了(Ghostty 等)
+      elseif userCopied then
+        fn(userClip)                 -- ③ 抓不到,但你刚真手动复制过 → 解释它(Apple Terminal)
+      else
+        fn(nil, secureInputOn())     -- ④ 真没选、也没新复制 → 读全屏
+      end
     end)
-    if sel == nil or sel == "" then fn(nil, secureInputOn()) else fn(sel) end
-  end)
+  end
+  doCopy(0)
 end
 
 local function explain(mode)
